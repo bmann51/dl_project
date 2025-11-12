@@ -195,6 +195,9 @@ def get_backbone(arch='vit_small', patch_size=16, img_size=96):
         elif arch == 'vit_small':
             model = timm.create_model('vit_small_patch16_224', pretrained=False,
                                      img_size=img_size, num_classes=0)
+        elif arch == 'vit_base':
+            model = timm.create_model('vit_base_patch16_224', pretrained=False,
+                                     img_size=img_size, num_classes=0)
         else:
             raise ValueError(f"Unknown architecture: {arch}")
         

@@ -216,7 +216,7 @@ def main(args):
     
     # Load model
     print(f"\nLoading checkpoint from {args.checkpoint}")
-    checkpoint = torch.load(args.checkpoint, map_location='cpu')
+    checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
     
     # Build backbone
     backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size)
@@ -292,7 +292,7 @@ if __name__ == '__main__':
     
     # Model parameters
     parser.add_argument('--arch', default='vit_small', type=str,
-                       choices=['vit_tiny', 'vit_small', 'resnet50'],
+                       choices=['vit_tiny', 'vit_small', 'vit_base', 'resnet50'],
                        help='Architecture')
     parser.add_argument('--checkpoint', required=True, type=str,
                        help='Path to checkpoint')
