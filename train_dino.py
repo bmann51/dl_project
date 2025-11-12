@@ -224,8 +224,20 @@ def main(args):
     print("\n" + "=" * 80)
     print("Starting Training")
     print("=" * 80)
+
+    start_epoch = 0
+    if args.resume:
+        print(f"Resuming from checkpoint: {args.resume}")
+        checkpoint = torch.load(args.resume, map_location='cpu', weights_only=False)
+        student.load_state_dict(checkpoint['student'])
+        teacher.load_state_dict(checkpoint['teacher'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        start_epoch = checkpoint['epoch']
+        if 'fp16_scaler' in checkpoint and fp16_scaler is not None:
+            fp16_scaler.load_state_dict(checkpoint['fp16_scaler'])
+        print(f"Resumed from epoch {start_epoch}")
     
-    for epoch in range(args.epochs):
+    for epoch in range(start_epoch, args.epochs):  # Change this line
         # Train one epoch
         train_stats = train_one_epoch(
             student, teacher, teacher,
@@ -272,7 +284,7 @@ if __name__ == '__main__':
     
     # Model parameters
     parser.add_argument('--arch', default='vit_small', type=str,
-                       choices=['vit_tiny', 'vit_small', 'resnet50'],
+                       choices=['vit_tiny', 'vit_small', 'vit_base', 'resnet50'],
                        help='Architecture')
     parser.add_argument('--image_size', default=96, type=int, help='Image size')
     parser.add_argument('--out_dim', default=8192, type=int,
@@ -333,6 +345,10 @@ if __name__ == '__main__':
                        help='Save checkpoint every n epochs')
     parser.add_argument('--num_workers', default=4, type=int,
                        help='Number of data loading workers')
+    
+    #Resume
+    parser.add_argument('--resume', default='', type=str,
+                       help='Path to checkpoint to resume from')
     
     args = parser.parse_args()
     
