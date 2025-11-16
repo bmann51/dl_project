@@ -40,7 +40,7 @@
     }
   },
   "shared_args": {
-    "data_path": "./data/pretrain/",
+    "data_path": "/mnt/user-data/uploads/pretrain/",
     "output_dir_base": "./experiments",
     "num_workers": 4,
     "save_freq": 10,

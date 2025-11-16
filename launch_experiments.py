@@ -36,7 +36,7 @@ def build_command(exp_name, exp_config, shared_args, use_slurm=False):
         cmd = ['python', 'train_dino.py']
     
     # Add shared arguments
-    cmd.extend(['--data_path', shared_args.get('data_path', './data/pretrain/')])
+    cmd.extend(['--data_path', shared_args.get('data_path', '/mnt/user-data/uploads/pretrain/')])
     output_dir = os.path.join(shared_args.get('output_dir_base', './experiments'), exp_name)
     cmd.extend(['--output_dir', output_dir])
     cmd.extend(['--num_workers', str(shared_args.get('num_workers', 4))])
@@ -158,7 +158,7 @@ def launch_slurm(experiments, shared_args):
             
             # Build training command
             cmd_parts = ['python', 'train_dino.py']
-            cmd_parts.extend(['--data_path', shared_args.get('data_path', './data/pretrain/')])
+            cmd_parts.extend(['--data_path', shared_args.get('data_path', '/mnt/user-data/uploads/pretrain/')])
             cmd_parts.extend(['--output_dir', output_dir])
             cmd_parts.extend(['--num_workers', str(shared_args.get('num_workers', 4))])
             cmd_parts.extend(['--save_freq', str(shared_args.get('save_freq', 10))])

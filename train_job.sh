@@ -31,7 +31,7 @@ mkdir -p logs
 #     --save_freq 10
 
 python train_dino.py \
-    --data_path ./data/pretrain/ \
+    --data_path /mnt/user-data/uploads/pretrain/ \
     --output_dir ./checkpoints_quick \
     --arch vit_tiny \
     --batch_size 256 \
