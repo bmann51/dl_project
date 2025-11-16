@@ -4,10 +4,13 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 import os
+import sys
+import math
 from pathlib import Path
 from tqdm import tqdm
 import argparse
 import json
+import csv
 from dino_ssl import (
     get_backbone, DINOHead, MultiCropWrapper, DINOLoss, 
     DataAugmentation, cosine_scheduler, update_momentum,
@@ -49,9 +52,15 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss,
     """
     Train for one epoch
     """
-    metric_logger = {}
+    # Accumulate metrics for averaging
+    loss_sum = 0.0
+    loss_count = 0
+    all_losses = []  # Store per-iteration losses
     
-    for it, (images, _) in enumerate(tqdm(data_loader, desc=f"Epoch {epoch}")):
+    # Create progress bar with initial description
+    pbar = tqdm(data_loader, desc=f"Epoch {epoch}")
+    
+    for it, (images, _) in enumerate(pbar):
         # Update learning rate and weight decay
         it_global = len(data_loader) * epoch + it
         for i, param_group in enumerate(optimizer.param_groups):
@@ -95,13 +104,31 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss,
             m = momentum_schedule[it_global]
             update_momentum(student, teacher_without_ddp, m)
         
-        # Logging
+        # Logging per iteration
         torch.cuda.synchronize()
-        metric_logger['loss'] = loss.item()
-        metric_logger['lr'] = optimizer.param_groups[0]["lr"]
-        metric_logger['wd'] = optimizer.param_groups[0]["weight_decay"]
+        loss_value = loss.item()
+        loss_sum += loss_value
+        loss_count += 1
+        all_losses.append(loss_value)
+        
+        # Update progress bar with current and average loss
+        avg_loss = loss_sum / loss_count
+        current_lr = optimizer.param_groups[0]["lr"]
+        pbar.set_postfix({
+            'loss': f'{loss_value:.4f}',
+            'avg_loss': f'{avg_loss:.4f}',
+            'lr': f'{current_lr:.2e}'
+        })
     
-    return {k: v for k, v in metric_logger.items()}
+    # Return metrics
+    metric_logger = {
+        'loss': avg_loss,
+        'lr': optimizer.param_groups[0]["lr"],
+        'wd': optimizer.param_groups[0]["weight_decay"],
+        'all_losses': all_losses  # Include per-iteration losses
+    }
+    
+    return metric_logger
 
 
 def main(args):
@@ -138,30 +165,66 @@ def main(args):
     
     # Build student and teacher networks
     print("\nBuilding models...")
-    student_backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size)
-    teacher_backbone, _ = get_backbone(args.arch, img_size=args.image_size)
+    # Set default drop_path_rate based on architecture if not specified
+    if args.drop_path_rate is None:
+        if 'tiny' in args.arch:
+            drop_path_rate = 0.1
+        elif 'small' in args.arch:
+            drop_path_rate = 0.1
+        elif 'base' in args.arch:
+            drop_path_rate = 0.15
+        else:
+            drop_path_rate = 0.0  # ResNet doesn't use drop_path
+    else:
+        drop_path_rate = args.drop_path_rate
     
-    student_head = DINOHead(
+    print(f"Using drop_path_rate: {drop_path_rate}")
+    
+    student_backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size, 
+                                                drop_path_rate=drop_path_rate)
+    teacher_backbone, _ = get_backbone(args.arch, img_size=args.image_size, 
+                                       drop_path_rate=drop_path_rate)
+    
+    # Create heads: global head and local head (untied)
+    student_global_head = DINOHead(
         embed_dim,
         args.out_dim,
         bottleneck_dim=args.bottleneck_dim,
         norm_last_layer=args.norm_last_layer,
     )
-    teacher_head = DINOHead(
+    student_local_head = DINOHead(
+        embed_dim,
+        args.out_dim,
+        bottleneck_dim=args.bottleneck_dim,
+        norm_last_layer=False,  # Local head doesn't need norm_last_layer
+    )
+    
+    # Teacher only uses global head (only sees global crops)
+    teacher_global_head = DINOHead(
         embed_dim,
         args.out_dim,
         bottleneck_dim=args.bottleneck_dim,
     )
     
-    student = MultiCropWrapper(student_backbone, student_head)
-    teacher = MultiCropWrapper(teacher_backbone, teacher_head)
+    # Student uses untied heads (global + local)
+    student = MultiCropWrapper(student_backbone, student_global_head, 
+                               local_head=student_local_head)
+    # Teacher only needs global head (only processes global crops)
+    teacher = MultiCropWrapper(teacher_backbone, teacher_global_head, 
+                               local_head=None)
     
     # Move to GPU
     student = student.to(device)
     teacher = teacher.to(device)
     
     # Teacher and student start with the same weights
-    teacher.load_state_dict(student.state_dict())
+    # Filter out local_head weights since teacher doesn't have one
+    student_state = student.state_dict()
+    teacher_state = teacher.state_dict()
+    # Only load weights that exist in both
+    filtered_state = {k: v for k, v in student_state.items() 
+                     if k in teacher_state and teacher_state[k].shape == v.shape}
+    teacher.load_state_dict(filtered_state, strict=False)
     # No gradients for teacher
     for p in teacher.parameters():
         p.requires_grad = False
@@ -225,6 +288,13 @@ def main(args):
     print("Starting Training")
     print("=" * 80)
 
+    # Setup loss logging CSV file
+    loss_log_path = os.path.join(args.output_dir, 'loss_log.csv')
+    loss_log_file = open(loss_log_path, 'w', newline='')
+    loss_log_writer = csv.writer(loss_log_file)
+    loss_log_writer.writerow(['epoch', 'iteration', 'loss', 'learning_rate'])
+    print(f"Loss logging to: {loss_log_path}")
+
     start_epoch = 0
     if args.resume:
         print(f"Resuming from checkpoint: {args.resume}")
@@ -247,6 +317,14 @@ def main(args):
             fp16_scaler, args
         )
         
+        # Log per-iteration losses to CSV
+        if 'all_losses' in train_stats:
+            for it, loss_val in enumerate(train_stats['all_losses']):
+                it_global = len(data_loader) * epoch + it
+                lr_val = lr_schedule[it_global] if it_global < len(lr_schedule) else lr_schedule[-1]
+                loss_log_writer.writerow([epoch, it, f'{loss_val:.6f}', f'{lr_val:.8e}'])
+            loss_log_file.flush()  # Ensure data is written
+        
         # Save checkpoint
         if (epoch + 1) % args.save_freq == 0 or epoch == args.epochs - 1:
             save_dict = {
@@ -263,8 +341,13 @@ def main(args):
             torch.save(save_dict, checkpoint_path)
             print(f"Saved checkpoint: {checkpoint_path}")
         
-        # Print statistics
-        print(f"Epoch {epoch} stats: {train_stats}")
+        # Print statistics (exclude all_losses from print to avoid clutter)
+        stats_to_print = {k: v for k, v in train_stats.items() if k != 'all_losses'}
+        print(f"Epoch {epoch} stats: {stats_to_print}")
+    
+    # Close loss log file
+    loss_log_file.close()
+    print(f"Loss log saved to: {loss_log_path}")
     
     # Save final model
     final_path = os.path.join(args.output_dir, 'final_checkpoint.pth')
@@ -277,9 +360,6 @@ def main(args):
 
 
 if __name__ == '__main__':
-    import sys
-    import math
-    
     parser = argparse.ArgumentParser('DINO', add_help=False)
     
     # Model parameters
@@ -293,6 +373,8 @@ if __name__ == '__main__':
                        help='Dimensionality of bottleneck in projection head')
     parser.add_argument('--norm_last_layer', default=True, type=bool,
                        help='Whether to weight normalize the last layer')
+    parser.add_argument('--drop_path_rate', default=None, type=float,
+                       help='Stochastic depth rate (drop path). Default: 0.1 for tiny/small, 0.15 for base')
     
     # Temperature parameters
     parser.add_argument('--warmup_teacher_temp', default=0.04, type=float,
