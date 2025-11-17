@@ -6,6 +6,7 @@ from PIL import Image
 import os
 import sys
 import math
+import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 import argparse
@@ -23,15 +24,23 @@ class UnlabeledImageDataset(Dataset):
     Dataset for unlabeled pretraining images.
     Supports both local directory and Hugging Face datasets.
     """
-    def __init__(self, root_dir, transform=None, use_hf_dataset=False, hf_dataset=None):
+    def __init__(self, root_dir, transform=None, use_hf_dataset=False, hf_dataset=None, hf_dataset_name=None):
         self.transform = transform
         self.use_hf_dataset = use_hf_dataset
+        self._hf_dataset = None  # Lazy loading for multiprocessing compatibility
+        self.hf_dataset_name = hf_dataset_name
         
-        if use_hf_dataset and hf_dataset is not None:
-            # Use Hugging Face dataset directly (more efficient, no disk extraction needed)
-            self.hf_dataset = hf_dataset
-            self.length = len(hf_dataset)
-            print(f"Using Hugging Face dataset with {self.length} images")
+        if use_hf_dataset:
+            if hf_dataset is not None:
+                # Store dataset directly (for single process)
+                self._hf_dataset = hf_dataset
+                self.length = len(hf_dataset)
+            elif hf_dataset_name is not None:
+                # Store dataset name for lazy loading (multiprocessing compatible)
+                self.length = None  # Will be set on first access
+            else:
+                raise ValueError("Either hf_dataset or hf_dataset_name must be provided")
+            print(f"Using Hugging Face dataset: {hf_dataset_name or 'loaded'}")
         else:
             # Use local directory (original behavior)
             self.root_dir = Path(root_dir)
@@ -41,27 +50,62 @@ class UnlabeledImageDataset(Dataset):
             self.length = len(self.image_paths)
             print(f"Found {self.length} images in {root_dir}")
     
+    @property
+    def hf_dataset(self):
+        """Lazy load Hugging Face dataset for multiprocessing compatibility."""
+        if self.use_hf_dataset and self._hf_dataset is None:
+            from datasets import load_dataset
+            self._hf_dataset = load_dataset(self.hf_dataset_name, split="train")
+            if self.length is None:
+                self.length = len(self._hf_dataset)
+        return self._hf_dataset
+    
     def __len__(self):
+        if self.length is None:
+            # Lazy load to get length
+            _ = self.hf_dataset
         return self.length
     
     def __getitem__(self, idx):
-        if self.use_hf_dataset:
-            # Get image directly from Hugging Face dataset
-            example = self.hf_dataset[idx]
-            image = example["image"]
-            if not isinstance(image, Image.Image):
-                image = Image.fromarray(image)
-            if image.mode != 'RGB':
-                image = image.convert('RGB')
-        else:
-            # Load from local file system
-            img_path = self.image_paths[idx]
-            image = Image.open(img_path).convert('RGB')
-        
-        if self.transform:
-            image = self.transform(image)
-        
-        return image, 0  # Return dummy label
+        try:
+            if self.use_hf_dataset:
+                # Get image directly from Hugging Face dataset
+                example = self.hf_dataset[idx]
+                image = example["image"]
+                
+                # Handle different image formats from Hugging Face
+                if isinstance(image, Image.Image):
+                    # Already a PIL Image - most common case
+                    pass
+                elif hasattr(image, '__array__'):  # NumPy array or similar
+                    image = Image.fromarray(np.asarray(image))
+                else:
+                    # Try to convert to PIL Image
+                    try:
+                        image = Image.fromarray(image)
+                    except Exception as e:
+                        # If conversion fails, try opening as bytes
+                        if hasattr(image, 'tobytes'):
+                            image = Image.frombytes(image.mode, image.size, image.tobytes())
+                        else:
+                            raise ValueError(f"Unable to convert image to PIL Image: {type(image)}, error: {e}")
+                
+                # Ensure RGB mode
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+            else:
+                # Load from local file system
+                img_path = self.image_paths[idx]
+                image = Image.open(img_path).convert('RGB')
+            
+            if self.transform:
+                image = self.transform(image)
+            
+            return image, 0  # Return dummy label
+        except Exception as e:
+            print(f"Error loading image at index {idx}: {e}")
+            print(f"Image type: {type(image) if 'image' in locals() else 'N/A'}")
+            raise
 
 
 def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, 
@@ -175,12 +219,14 @@ def main(args):
         from datasets import load_dataset
         hf_dataset_name = args.data_path[3:]  # Remove "hf://" prefix
         print(f"Loading Hugging Face dataset: {hf_dataset_name}")
+        # Load dataset to get length, but store name for multiprocessing compatibility
         hf_dataset = load_dataset(hf_dataset_name, split="train")
         dataset = UnlabeledImageDataset(
             args.data_path, 
             transform=transform, 
             use_hf_dataset=True, 
-            hf_dataset=hf_dataset
+            hf_dataset=hf_dataset,  # Pre-load for main process
+            hf_dataset_name=hf_dataset_name  # Store name for worker processes
         )
     else:
         dataset = UnlabeledImageDataset(args.data_path, transform=transform)
