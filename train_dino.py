@@ -217,7 +217,7 @@ def main(args):
     
     if use_hf_dataset:
         from datasets import load_dataset
-        hf_dataset_name = args.data_path[3:]  # Remove "hf://" prefix
+        hf_dataset_name = args.data_path.replace("hf://", "")  # Remove "hf://" prefix
         print(f"Loading Hugging Face dataset: {hf_dataset_name}")
         # Load dataset to get length, but store name for multiprocessing compatibility
         hf_dataset = load_dataset(hf_dataset_name, split="train")
