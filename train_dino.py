@@ -469,8 +469,8 @@ if __name__ == '__main__':
     # Training parameters
     parser.add_argument('--momentum_teacher', default=0.996, type=float,
                        help='Base EMA parameter for teacher update')
-    parser.add_argument('--use_fp16', default=True, type=bool,
-                       help='Whether to use mixed precision training')
+    parser.add_argument('--use_fp16', action='store_true',
+                       help='Whether to use mixed precision training (default: True)')
     parser.add_argument('--weight_decay', default=0.04, type=float,
                        help='Initial weight decay')
     parser.add_argument('--weight_decay_end', default=0.4, type=float,
