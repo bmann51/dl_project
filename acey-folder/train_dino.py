@@ -4,10 +4,14 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 import os
+import sys
+import math
+import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 import argparse
 import json
+import csv
 from dino_ssl import (
     get_backbone, DINOHead, MultiCropWrapper, DINOLoss, 
     DataAugmentation, cosine_scheduler, update_momentum,
@@ -17,30 +21,91 @@ from dino_ssl import (
 
 class UnlabeledImageDataset(Dataset):
     """
-    Dataset for unlabeled pretraining images
+    Dataset for unlabeled pretraining images.
+    Supports both local directory and Hugging Face datasets.
     """
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = Path(root_dir)
+    def __init__(self, root_dir, transform=None, use_hf_dataset=False, hf_dataset=None, hf_dataset_name=None):
         self.transform = transform
+        self.use_hf_dataset = use_hf_dataset
+        self._hf_dataset = None  # Lazy loading for multiprocessing compatibility
+        self.hf_dataset_name = hf_dataset_name
         
-        # Collect all image files
-        self.image_paths = []
-        for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPEG', '*.JPG', '*.PNG']:
-            self.image_paths.extend(self.root_dir.rglob(ext))
-        
-        print(f"Found {len(self.image_paths)} images in {root_dir}")
+        if use_hf_dataset:
+            if hf_dataset is not None:
+                # Store dataset directly (for single process)
+                self._hf_dataset = hf_dataset
+                self.length = len(hf_dataset)
+            elif hf_dataset_name is not None:
+                # Store dataset name for lazy loading (multiprocessing compatible)
+                self.length = None  # Will be set on first access
+            else:
+                raise ValueError("Either hf_dataset or hf_dataset_name must be provided")
+            print(f"Using Hugging Face dataset: {hf_dataset_name or 'loaded'}")
+        else:
+            # Use local directory (original behavior)
+            self.root_dir = Path(root_dir)
+            self.image_paths = []
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPEG', '*.JPG', '*.PNG']:
+                self.image_paths.extend(self.root_dir.rglob(ext))
+            self.length = len(self.image_paths)
+            print(f"Found {self.length} images in {root_dir}")
+    
+    @property
+    def hf_dataset(self):
+        """Lazy load Hugging Face dataset for multiprocessing compatibility."""
+        if self.use_hf_dataset and self._hf_dataset is None:
+            from datasets import load_dataset
+            self._hf_dataset = load_dataset(self.hf_dataset_name, split="train")
+            if self.length is None:
+                self.length = len(self._hf_dataset)
+        return self._hf_dataset
     
     def __len__(self):
-        return len(self.image_paths)
+        if self.length is None:
+            # Lazy load to get length
+            _ = self.hf_dataset
+        return self.length
     
     def __getitem__(self, idx):
-        img_path = self.image_paths[idx]
-        image = Image.open(img_path).convert('RGB')
-        
-        if self.transform:
-            image = self.transform(image)
-        
-        return image, 0  # Return dummy label
+        try:
+            if self.use_hf_dataset:
+                # Get image directly from Hugging Face dataset
+                example = self.hf_dataset[idx]
+                image = example["image"]
+                
+                # Handle different image formats from Hugging Face
+                if isinstance(image, Image.Image):
+                    # Already a PIL Image - most common case
+                    pass
+                elif hasattr(image, '__array__'):  # NumPy array or similar
+                    image = Image.fromarray(np.asarray(image))
+                else:
+                    # Try to convert to PIL Image
+                    try:
+                        image = Image.fromarray(image)
+                    except Exception as e:
+                        # If conversion fails, try opening as bytes
+                        if hasattr(image, 'tobytes'):
+                            image = Image.frombytes(image.mode, image.size, image.tobytes())
+                        else:
+                            raise ValueError(f"Unable to convert image to PIL Image: {type(image)}, error: {e}")
+                
+                # Ensure RGB mode
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+            else:
+                # Load from local file system
+                img_path = self.image_paths[idx]
+                image = Image.open(img_path).convert('RGB')
+            
+            if self.transform:
+                image = self.transform(image)
+            
+            return image, 0  # Return dummy label
+        except Exception as e:
+            print(f"Error loading image at index {idx}: {e}")
+            print(f"Image type: {type(image) if 'image' in locals() else 'N/A'}")
+            raise
 
 
 def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss, 
@@ -49,9 +114,15 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss,
     """
     Train for one epoch
     """
-    metric_logger = {}
+    # Accumulate metrics for averaging
+    loss_sum = 0.0
+    loss_count = 0
+    all_losses = []  # Store per-iteration losses
     
-    for it, (images, _) in enumerate(tqdm(data_loader, desc=f"Epoch {epoch}")):
+    # Create progress bar with initial description
+    pbar = tqdm(data_loader, desc=f"Epoch {epoch}")
+    
+    for it, (images, _) in enumerate(pbar):
         # Update learning rate and weight decay
         it_global = len(data_loader) * epoch + it
         for i, param_group in enumerate(optimizer.param_groups):
@@ -95,13 +166,31 @@ def train_one_epoch(student, teacher, teacher_without_ddp, dino_loss,
             m = momentum_schedule[it_global]
             update_momentum(student, teacher_without_ddp, m)
         
-        # Logging
+        # Logging per iteration
         torch.cuda.synchronize()
-        metric_logger['loss'] = loss.item()
-        metric_logger['lr'] = optimizer.param_groups[0]["lr"]
-        metric_logger['wd'] = optimizer.param_groups[0]["weight_decay"]
+        loss_value = loss.item()
+        loss_sum += loss_value
+        loss_count += 1
+        all_losses.append(loss_value)
+        
+        # Update progress bar with current and average loss
+        avg_loss = loss_sum / loss_count
+        current_lr = optimizer.param_groups[0]["lr"]
+        pbar.set_postfix({
+            'loss': f'{loss_value:.4f}',
+            'avg_loss': f'{avg_loss:.4f}',
+            'lr': f'{current_lr:.2e}'
+        })
     
-    return {k: v for k, v in metric_logger.items()}
+    # Return metrics
+    metric_logger = {
+        'loss': avg_loss,
+        'lr': optimizer.param_groups[0]["lr"],
+        'wd': optimizer.param_groups[0]["weight_decay"],
+        'all_losses': all_losses  # Include per-iteration losses
+    }
+    
+    return metric_logger
 
 
 def main(args):
@@ -122,7 +211,25 @@ def main(args):
     )
     
     # Dataset and DataLoader
-    dataset = UnlabeledImageDataset(args.data_path, transform=transform)
+    # Support Hugging Face datasets if data_path starts with "hf://"
+    use_hf_dataset = args.data_path.startswith("hf://")
+    hf_dataset = None
+    
+    if use_hf_dataset:
+        from datasets import load_dataset
+        hf_dataset_name = args.data_path.replace("hf://", "")  # Remove "hf://" prefix
+        print(f"Loading Hugging Face dataset: {hf_dataset_name}")
+        # Load dataset to get length, but store name for multiprocessing compatibility
+        hf_dataset = load_dataset(hf_dataset_name, split="train")
+        dataset = UnlabeledImageDataset(
+            args.data_path, 
+            transform=transform, 
+            use_hf_dataset=True, 
+            hf_dataset=hf_dataset,  # Pre-load for main process
+            hf_dataset_name=hf_dataset_name  # Store name for worker processes
+        )
+    else:
+        dataset = UnlabeledImageDataset(args.data_path, transform=transform)
     data_loader = DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -138,30 +245,66 @@ def main(args):
     
     # Build student and teacher networks
     print("\nBuilding models...")
-    student_backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size)
-    teacher_backbone, _ = get_backbone(args.arch, img_size=args.image_size)
+    # Set default drop_path_rate based on architecture if not specified
+    if args.drop_path_rate is None:
+        if 'tiny' in args.arch:
+            drop_path_rate = 0.1
+        elif 'small' in args.arch:
+            drop_path_rate = 0.1
+        elif 'base' in args.arch:
+            drop_path_rate = 0.15
+        else:
+            drop_path_rate = 0.0  # ResNet doesn't use drop_path
+    else:
+        drop_path_rate = args.drop_path_rate
     
-    student_head = DINOHead(
+    print(f"Using drop_path_rate: {drop_path_rate}")
+    
+    student_backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size, 
+                                                drop_path_rate=drop_path_rate)
+    teacher_backbone, _ = get_backbone(args.arch, img_size=args.image_size, 
+                                       drop_path_rate=drop_path_rate)
+    
+    # Create heads: global head and local head (untied)
+    student_global_head = DINOHead(
         embed_dim,
         args.out_dim,
         bottleneck_dim=args.bottleneck_dim,
         norm_last_layer=args.norm_last_layer,
     )
-    teacher_head = DINOHead(
+    student_local_head = DINOHead(
+        embed_dim,
+        args.out_dim,
+        bottleneck_dim=args.bottleneck_dim,
+        norm_last_layer=False,  # Local head doesn't need norm_last_layer
+    )
+    
+    # Teacher only uses global head (only sees global crops)
+    teacher_global_head = DINOHead(
         embed_dim,
         args.out_dim,
         bottleneck_dim=args.bottleneck_dim,
     )
     
-    student = MultiCropWrapper(student_backbone, student_head)
-    teacher = MultiCropWrapper(teacher_backbone, teacher_head)
+    # Student uses untied heads (global + local)
+    student = MultiCropWrapper(student_backbone, student_global_head, 
+                               local_head=student_local_head)
+    # Teacher only needs global head (only processes global crops)
+    teacher = MultiCropWrapper(teacher_backbone, teacher_global_head, 
+                               local_head=None)
     
     # Move to GPU
     student = student.to(device)
     teacher = teacher.to(device)
     
     # Teacher and student start with the same weights
-    teacher.load_state_dict(student.state_dict())
+    # Filter out local_head weights since teacher doesn't have one
+    student_state = student.state_dict()
+    teacher_state = teacher.state_dict()
+    # Only load weights that exist in both
+    filtered_state = {k: v for k, v in student_state.items() 
+                     if k in teacher_state and teacher_state[k].shape == v.shape}
+    teacher.load_state_dict(filtered_state, strict=False)
     # No gradients for teacher
     for p in teacher.parameters():
         p.requires_grad = False
@@ -225,6 +368,13 @@ def main(args):
     print("Starting Training")
     print("=" * 80)
 
+    # Setup loss logging CSV file
+    loss_log_path = os.path.join(args.output_dir, 'loss_log.csv')
+    loss_log_file = open(loss_log_path, 'w', newline='')
+    loss_log_writer = csv.writer(loss_log_file)
+    loss_log_writer.writerow(['epoch', 'iteration', 'loss', 'learning_rate'])
+    print(f"Loss logging to: {loss_log_path}")
+
     start_epoch = 0
     if args.resume:
         print(f"Resuming from checkpoint: {args.resume}")
@@ -247,6 +397,14 @@ def main(args):
             fp16_scaler, args
         )
         
+        # Log per-iteration losses to CSV
+        if 'all_losses' in train_stats:
+            for it, loss_val in enumerate(train_stats['all_losses']):
+                it_global = len(data_loader) * epoch + it
+                lr_val = lr_schedule[it_global] if it_global < len(lr_schedule) else lr_schedule[-1]
+                loss_log_writer.writerow([epoch, it, f'{loss_val:.6f}', f'{lr_val:.8e}'])
+            loss_log_file.flush()  # Ensure data is written
+        
         # Save checkpoint
         if (epoch + 1) % args.save_freq == 0 or epoch == args.epochs - 1:
             save_dict = {
@@ -263,8 +421,13 @@ def main(args):
             torch.save(save_dict, checkpoint_path)
             print(f"Saved checkpoint: {checkpoint_path}")
         
-        # Print statistics
-        print(f"Epoch {epoch} stats: {train_stats}")
+        # Print statistics (exclude all_losses from print to avoid clutter)
+        stats_to_print = {k: v for k, v in train_stats.items() if k != 'all_losses'}
+        print(f"Epoch {epoch} stats: {stats_to_print}")
+    
+    # Close loss log file
+    loss_log_file.close()
+    print(f"Loss log saved to: {loss_log_path}")
     
     # Save final model
     final_path = os.path.join(args.output_dir, 'final_checkpoint.pth')
@@ -277,9 +440,6 @@ def main(args):
 
 
 if __name__ == '__main__':
-    import sys
-    import math
-    
     parser = argparse.ArgumentParser('DINO', add_help=False)
     
     # Model parameters
@@ -293,6 +453,8 @@ if __name__ == '__main__':
                        help='Dimensionality of bottleneck in projection head')
     parser.add_argument('--norm_last_layer', default=True, type=bool,
                        help='Whether to weight normalize the last layer')
+    parser.add_argument('--drop_path_rate', default=None, type=float,
+                       help='Stochastic depth rate (drop path). Default: 0.1 for tiny/small, 0.15 for base')
     
     # Temperature parameters
     parser.add_argument('--warmup_teacher_temp', default=0.04, type=float,
@@ -307,8 +469,8 @@ if __name__ == '__main__':
     # Training parameters
     parser.add_argument('--momentum_teacher', default=0.996, type=float,
                        help='Base EMA parameter for teacher update')
-    parser.add_argument('--use_fp16', default=True, type=bool,
-                       help='Whether to use mixed precision training')
+    parser.add_argument('--use_fp16', action='store_true',
+                       help='Whether to use mixed precision training (default: True)')
     parser.add_argument('--weight_decay', default=0.04, type=float,
                        help='Initial weight decay')
     parser.add_argument('--weight_decay_end', default=0.4, type=float,
