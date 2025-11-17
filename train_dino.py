@@ -20,25 +20,43 @@ from dino_ssl import (
 
 class UnlabeledImageDataset(Dataset):
     """
-    Dataset for unlabeled pretraining images
+    Dataset for unlabeled pretraining images.
+    Supports both local directory and Hugging Face datasets.
     """
-    def __init__(self, root_dir, transform=None):
-        self.root_dir = Path(root_dir)
+    def __init__(self, root_dir, transform=None, use_hf_dataset=False, hf_dataset=None):
         self.transform = transform
+        self.use_hf_dataset = use_hf_dataset
         
-        # Collect all image files
-        self.image_paths = []
-        for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPEG', '*.JPG', '*.PNG']:
-            self.image_paths.extend(self.root_dir.rglob(ext))
-        
-        print(f"Found {len(self.image_paths)} images in {root_dir}")
+        if use_hf_dataset and hf_dataset is not None:
+            # Use Hugging Face dataset directly (more efficient, no disk extraction needed)
+            self.hf_dataset = hf_dataset
+            self.length = len(hf_dataset)
+            print(f"Using Hugging Face dataset with {self.length} images")
+        else:
+            # Use local directory (original behavior)
+            self.root_dir = Path(root_dir)
+            self.image_paths = []
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPEG', '*.JPG', '*.PNG']:
+                self.image_paths.extend(self.root_dir.rglob(ext))
+            self.length = len(self.image_paths)
+            print(f"Found {self.length} images in {root_dir}")
     
     def __len__(self):
-        return len(self.image_paths)
+        return self.length
     
     def __getitem__(self, idx):
-        img_path = self.image_paths[idx]
-        image = Image.open(img_path).convert('RGB')
+        if self.use_hf_dataset:
+            # Get image directly from Hugging Face dataset
+            example = self.hf_dataset[idx]
+            image = example["image"]
+            if not isinstance(image, Image.Image):
+                image = Image.fromarray(image)
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+        else:
+            # Load from local file system
+            img_path = self.image_paths[idx]
+            image = Image.open(img_path).convert('RGB')
         
         if self.transform:
             image = self.transform(image)
@@ -149,7 +167,23 @@ def main(args):
     )
     
     # Dataset and DataLoader
-    dataset = UnlabeledImageDataset(args.data_path, transform=transform)
+    # Support Hugging Face datasets if data_path starts with "hf://"
+    use_hf_dataset = args.data_path.startswith("hf://")
+    hf_dataset = None
+    
+    if use_hf_dataset:
+        from datasets import load_dataset
+        hf_dataset_name = args.data_path[3:]  # Remove "hf://" prefix
+        print(f"Loading Hugging Face dataset: {hf_dataset_name}")
+        hf_dataset = load_dataset(hf_dataset_name, split="train")
+        dataset = UnlabeledImageDataset(
+            args.data_path, 
+            transform=transform, 
+            use_hf_dataset=True, 
+            hf_dataset=hf_dataset
+        )
+    else:
+        dataset = UnlabeledImageDataset(args.data_path, transform=transform)
     data_loader = DataLoader(
         dataset,
         batch_size=args.batch_size,
