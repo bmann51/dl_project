@@ -26,7 +26,7 @@ python train_dino.py \
     --output_dir /gpfs/scratch/bm3772/checkpoints_large_batch \
     --arch vit_small \
     --batch_size 128 \
-    --lr 0.001 \
+    --lr 0.0005 \
     --drop_path_rate 0.1 \
     --epochs 100 \
     --warmup_epochs 10 \
