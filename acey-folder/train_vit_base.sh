@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --ntasks-per-node=1
 #SBATCH --gres=gpu:a100:1
-#SBATCH --time=2:00:00
+#SBATCH --time=60:00:00
 #SBATCH --mem=64G
 #SBATCH --partition=a100_short
 #SBATCH --output=logs/train_vit_base_%j.out
@@ -22,8 +22,8 @@ mkdir -p logs
 
 # Run training
 python train_dino.py \
-    --data_path /mnt/user-data/uploads/pretrain/ \
-    --output_dir ./experiments/vit_base \
+    --data_path /gpfs/scratch/bm3772/fall2025_data/train \
+    --output_dir /gpfs/scratch/bm3772/checkpoints_vit_base \
     --arch vit_base \
     --batch_size 32 \
     --lr 0.0005 \
@@ -33,8 +33,8 @@ python train_dino.py \
     --local_crops_number 6 \
     --bottleneck_dim 128 \
     --out_dim 4096 \
-    --num_workers 4 \
+    --num_workers 8 \
     --save_freq 10 \
     --use_fp16
-    # --resume ./experiments/vit_base/checkpoint_XXXX.pth
+    # --resume /gpfs/scratch/bm3772/checkpoints_vit_base/checkpoint_XXXX.pth
 
