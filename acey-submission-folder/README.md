@@ -1,6 +1,6 @@
 # Acey's DINO Submission Generator
 
-This folder contains Acey's self-contained submission generation pipeline. It works exactly like `brian-folder/generate_submission2.py` but uses Acey's model architecture (untied heads).
+This folder contains Acey's self-contained submission generation pipeline. It works exactly like `brian-folder/generate_submission2.py` but uses Acey's model architecture (major difference is untied heads).
 
 ## Quick Start for Brian
 
