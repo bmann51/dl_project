@@ -202,10 +202,10 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Data augmentation
+    # Data augmentation - use stronger augmentation to reduce overfitting
     transform = DataAugmentation(
-        global_crops_scale=(0.4, 1.0),
-        local_crops_scale=(0.05, 0.4),
+        global_crops_scale=(0.32, 1.0),  # Wider scale range for more diversity
+        local_crops_scale=(0.05, 0.32),  # Adjusted to match
         local_crops_number=args.local_crops_number,
         size=args.image_size
     )
@@ -246,13 +246,14 @@ def main(args):
     # Build student and teacher networks
     print("\nBuilding models...")
     # Set default drop_path_rate based on architecture if not specified
+    # Increased rates to reduce overfitting
     if args.drop_path_rate is None:
         if 'tiny' in args.arch:
-            drop_path_rate = 0.1
+            drop_path_rate = 0.15  # Increased from 0.1
         elif 'small' in args.arch:
-            drop_path_rate = 0.1
+            drop_path_rate = 0.2  # Increased from 0.1
         elif 'base' in args.arch:
-            drop_path_rate = 0.15
+            drop_path_rate = 0.25  # Increased from 0.15
         else:
             drop_path_rate = 0.0  # ResNet doesn't use drop_path
     else:

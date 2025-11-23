@@ -57,11 +57,26 @@ def extract_features(model, data_loader, device):
     features_list = []
     labels_list = []
     
+    # Debug: check a sample batch
+    sample_checked = False
+    
     for images, labels in tqdm(data_loader, desc="Extracting features"):
         images = images.to(device)
         
+        # Debug: print first batch info
+        if not sample_checked:
+            print(f"Sample batch - images shape: {images.shape}, dtype: {images.dtype}")
+            print(f"Sample batch - images min: {images.min().item():.3f}, max: {images.max().item():.3f}, mean: {images.mean().item():.3f}")
+            sample_checked = True
+        
         # Get features from backbone
         features = model(images)
+        
+        # Debug: check feature statistics on first batch
+        if not sample_checked:
+            print(f"Sample features - shape: {features.shape}, dtype: {features.dtype}")
+            print(f"Sample features - min: {features.min().item():.3f}, max: {features.max().item():.3f}, mean: {features.mean().item():.3f}, std: {features.std().item():.3f}")
+            sample_checked = True
         
         # Normalize features (important for k-NN)
         features = nn.functional.normalize(features, dim=1, p=2)
@@ -71,6 +86,10 @@ def extract_features(model, data_loader, device):
     
     features = torch.cat(features_list, dim=0).numpy()
     labels = torch.cat(labels_list, dim=0).numpy()
+    
+    print(f"\nExtracted features - shape: {features.shape}, dtype: {features.dtype}")
+    print(f"Extracted features - min: {features.min():.3f}, max: {features.max():.3f}, mean: {features.mean():.3f}, std: {features.std():.3f}")
+    print(f"Extracted labels - shape: {labels.shape}, unique labels: {np.unique(labels)}")
     
     return features, labels
 
@@ -233,9 +252,31 @@ def main(args):
     backbone_state_dict = {}
     for k, v in state_dict.items():
         if 'backbone' in k:
-            backbone_state_dict[k.replace('backbone.', '')] = v
+            # Remove 'backbone.' prefix if it exists
+            new_key = k.replace('backbone.', '')
+            backbone_state_dict[new_key] = v
+        elif 'head' not in k and 'last_layer' not in k:
+            # If keys don't have 'backbone' prefix, try loading directly
+            # (this handles cases where state dict is just the backbone)
+            backbone_state_dict[k] = v
     
-    backbone.load_state_dict(backbone_state_dict, strict=False)
+    # Debug: print some keys to verify loading
+    print(f"State dict keys (first 5): {list(state_dict.keys())[:5]}")
+    print(f"Backbone state dict keys (first 5): {list(backbone_state_dict.keys())[:5]}")
+    print(f"Total keys in state_dict: {len(state_dict)}, in backbone_state_dict: {len(backbone_state_dict)}")
+    
+    if len(backbone_state_dict) == 0:
+        print("WARNING: No backbone weights found! Trying to load all non-head weights...")
+        # Fallback: try loading all weights that aren't from the head
+        backbone_state_dict = {k: v for k, v in state_dict.items() 
+                              if 'head' not in k and 'last_layer' not in k}
+        print(f"Fallback: Found {len(backbone_state_dict)} keys")
+    
+    missing_keys, unexpected_keys = backbone.load_state_dict(backbone_state_dict, strict=False)
+    if missing_keys:
+        print(f"WARNING: Missing keys when loading backbone: {missing_keys[:5]}... (showing first 5)")
+    if unexpected_keys:
+        print(f"WARNING: Unexpected keys when loading backbone: {unexpected_keys[:5]}... (showing first 5)")
     backbone = backbone.to(device)
     backbone.eval()
     

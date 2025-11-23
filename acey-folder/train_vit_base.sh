@@ -27,7 +27,7 @@ python train_dino.py \
     --arch vit_base \
     --batch_size 32 \
     --lr 0.0005 \
-    --drop_path_rate 0.15 \
+    --drop_path_rate 0.25 \
     --epochs 100 \
     --warmup_epochs 10 \
     --local_crops_number 6 \

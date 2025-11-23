@@ -151,15 +151,16 @@ class DataAugmentation:
     """
     def __init__(self, global_crops_scale=(0.4, 1.), local_crops_scale=(0.05, 0.4),
                  local_crops_number=6, size=96):
-        # Global crops (2)
+        # Global crops (2) - stronger augmentation to reduce overfitting
         self.global_transfo1 = transforms.Compose([
             transforms.RandomResizedCrop(size, scale=global_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.2)  # Increased color jitter strength
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.5),
+            transforms.RandomApply([transforms.RandomErasing(p=0.25, scale=(0.02, 0.33))], p=0.3),  # Add random erasing
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
@@ -168,25 +169,27 @@ class DataAugmentation:
             transforms.RandomResizedCrop(size, scale=global_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.2)  # Increased color jitter strength
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.1),
             transforms.RandomSolarize(threshold=128, p=0.2),
+            transforms.RandomApply([transforms.RandomErasing(p=0.25, scale=(0.02, 0.33))], p=0.3),  # Add random erasing
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
         
-        # Local crops
+        # Local crops - stronger augmentation
         self.local_crops_number = local_crops_number
         self.local_transfo = transforms.Compose([
             transforms.RandomResizedCrop(size, scale=local_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.2)  # Increased color jitter strength
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.5),
+            transforms.RandomApply([transforms.RandomErasing(p=0.25, scale=(0.02, 0.33))], p=0.3),  # Add random erasing
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
