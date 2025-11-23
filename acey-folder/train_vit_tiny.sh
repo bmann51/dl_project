@@ -1,0 +1,43 @@
+#!/bin/bash
+#SBATCH --job-name=dino_vit_tiny
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=8
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --time=60:00:00
+#SBATCH --mem=64G
+#SBATCH --partition=a100_short
+#SBATCH --output=logs/train_vit_tiny_%j.out
+#SBATCH --error=logs/train_vit_tiny_%j.err
+
+# Load modules
+module load cuda/11.8
+
+# Activate environment
+source ~/.bashrc
+conda activate dino_new
+
+# Create logs directory
+mkdir -p logs
+
+# Run training with smaller model (vit_tiny) to reduce overfitting capacity
+# Strategy: Smaller model with aggressive regularization
+python train_dino.py \
+    --data_path /gpfs/scratch/bm3772/fall2025_data/train \
+    --output_dir /gpfs/scratch/bm3772/checkpoints_vit_tiny \
+    --arch vit_tiny \
+    --batch_size 128 \
+    --lr 0.0005 \
+    --drop_path_rate 0.2 \
+    --weight_decay 0.05 \
+    --weight_decay_end 0.45 \
+    --epochs 100 \
+    --warmup_epochs 10 \
+    --local_crops_number 6 \
+    --bottleneck_dim 128 \
+    --out_dim 4096 \
+    --num_workers 8 \
+    --save_freq 10 \
+    --use_fp16
+    # --resume /gpfs/scratch/bm3772/checkpoints_vit_tiny/checkpoint_XXXX.pth
+
