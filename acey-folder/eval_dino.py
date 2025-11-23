@@ -89,6 +89,11 @@ def extract_features(model, data_loader, device):
     
     print(f"\nExtracted features - shape: {features.shape}, dtype: {features.dtype}")
     print(f"Extracted features - min: {features.min():.3f}, max: {features.max():.3f}, mean: {features.mean():.3f}, std: {features.std():.3f}")
+    # Verify normalization: L2 norm should be ~1.0 for each feature vector
+    feature_norms = np.linalg.norm(features, axis=1)
+    print(f"Feature L2 norms - min: {feature_norms.min():.3f}, max: {feature_norms.max():.3f}, mean: {feature_norms.mean():.3f}")
+    if not np.allclose(feature_norms, 1.0, atol=1e-5):
+        print("WARNING: Features are not properly normalized! L2 norms should be ~1.0")
     print(f"Extracted labels - shape: {labels.shape}, unique labels: {np.unique(labels)}")
     
     return features, labels
