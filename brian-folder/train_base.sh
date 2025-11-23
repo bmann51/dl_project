@@ -23,20 +23,23 @@ mkdir -p logs
 # Run training
 # python train_dino.py \
 #     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-#     --output_dir /gpfs/scratch/bm3772/checkpoints_base \
+#     --output_dir /gpfs/scratch/bm3772/checkpoints_base50 \
 #     --arch vit_base \
 #     --batch_size 64 \
-#     --epochs 100 \
+#     --epochs 50 \
 #     --num_workers 8 \
 #     --save_freq 10
-#     # --resume /gpfs/scratch/bm3772/checkpoints_base/checkpoint.pth
+    # --resume /gpfs/scratch/bm3772/checkpoints_base/checkpoint.pth
 
 
 python eval_dino.py \
-    --checkpoint /gpfs/scratch/bm3772/checkpoints_base/final_checkpoint.pth \
+    --checkpoint /gpfs/scratch/bm3772/checkpoints_baseline/final_checkpoint.pth \
     --arch vit_base \
-    --train_path /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data/train \
-    --test_path /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data/test \
+    --train_path /gpfs/scratch/bm3772/cifar10_dino/eval_public/train \
+    --test_path /gpfs/scratch/bm3772/cifar10_dino/eval_public/test \
+    --image_size 96 \
     --k 20
+
+    # --checkpoint /gpfs/scratch/bm3772/checkpoints_base200/checkpoint_0179.pth \
 
     #./data/eval_public/test

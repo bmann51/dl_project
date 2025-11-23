@@ -26,9 +26,9 @@ echo "GPU info:"
 nvidia-smi
 
 # Set paths
-CHECKPOINT="/gpfs/scratch/bm3772/checkpoints_base/final_checkpoint.pth"
+CHECKPOINT="/gpfs/scratch/bm3772/checkpoints_small/final_checkpoint.pth"
 DATA_DIR="/gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data"  # Update this to your actual data directory
-OUTPUT="submission_vit_base.csv"
+OUTPUT="submission_small.csv"
 
 # Run submission script
 echo ""
@@ -36,12 +36,16 @@ echo "Creating submission with checkpoint: $CHECKPOINT"
 echo ""
 
 python generate_submission2.py \
-    --checkpoint /gpfs/scratch/bm3772/checkpoints_base/final_checkpoint.pth \
+    --checkpoint /gpfs/scratch/bm3772/checkpoints_base200/checkpoint_0179.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data \
-    --output submission_base.csv \
+    --output submission_base200.csv \
     --arch vit_base \
     --resolution 96 \
-    --k 5
+    --k 20
+
+    # --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data \
+    # --data_dir /gpfs/scratch/bm3772/cifar10_dinot/eval_public \
+    # --checkpoint /gpfs/scratch/bm3772/checkpoints_small/checkpoint_0039.pth \
 
 # python generate_submission2.py \
 #     --checkpoint /gpfs/scratch/bm3772/checkpoints_vit_base/final_checkpoint.pth \
