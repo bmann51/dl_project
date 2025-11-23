@@ -41,28 +41,46 @@ class DINOHead(nn.Module):
 
 class MultiCropWrapper(nn.Module):
     """
-    Wrapper to handle multiple crops (global + local views)
+    Wrapper to handle multiple crops (global + local views) with untied heads.
+    Supports both tied (single head) and untied (separate global/local heads) modes.
     """
-    def __init__(self, backbone, head):
+    def __init__(self, backbone, head, local_head=None):
         super().__init__()
         self.backbone = backbone
-        self.head = head
+        self.head = head  # Global head (or shared head if local_head is None)
+        self.local_head = local_head  # Local head (None means tied heads)
+        self.use_untied = local_head is not None
     
     def forward(self, x):
-        # If input is a list of crops, concatenate them
+        # If input is a list of crops, process global and local separately
         if isinstance(x, list):
-            idx_crops = torch.cumsum(torch.unique_consecutive(
-                torch.tensor([inp.shape[-1] for inp in x]),
-                return_counts=True)[1], 0)
-            start_idx = 0
+            # First 2 crops are global, rest are local
+            n_global = 2
+            global_crops = x[:n_global]
+            local_crops = x[n_global:] if len(x) > n_global else []
+            
             output = []
-            for end_idx in idx_crops:
-                _out = self.backbone(torch.cat(x[start_idx:end_idx]))
-                _out = self.head(_out)
-                output.append(_out)
-                start_idx = end_idx
-            return torch.cat(output)
+            
+            # Process global crops
+            if len(global_crops) > 0:
+                global_batch = torch.cat(global_crops)
+                global_features = self.backbone(global_batch)
+                global_out = self.head(global_features)  # Always use global head
+                output.append(global_out)
+            
+            # Process local crops
+            if len(local_crops) > 0:
+                local_batch = torch.cat(local_crops)
+                local_features = self.backbone(local_batch)
+                if self.use_untied:
+                    local_out = self.local_head(local_features)
+                else:
+                    local_out = self.head(local_features)
+                output.append(local_out)
+            
+            return torch.cat(output) if len(output) > 0 else torch.empty(0)
         else:
+            # Single image (assume global)
             _out = self.backbone(x)
             _out = self.head(_out)
             return _out
@@ -131,19 +149,18 @@ class DataAugmentation:
     """
     Multi-crop augmentation strategy from DINO
     """
-    def __init__(self, global_crops_scale=(0.4, 1.),  
-                #  local_crops_scale=(0.05, 0.4),
-                local_crops_scale=(0.2, 0.4), # Increased the minimum size
+    def __init__(self, global_crops_scale=(0.4, 1.), local_crops_scale=(0.05, 0.4),
                  local_crops_number=6, size=96):
-        # Global crops (2)
+        # Global crops (2) - stronger augmentation to reduce overfitting
         self.global_transfo1 = transforms.Compose([
             transforms.RandomResizedCrop(size, scale=global_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.2)  # Increased color jitter strength
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.5),
+            transforms.RandomApply([transforms.RandomErasing(p=0.25, scale=(0.02, 0.33))], p=0.3),  # Add random erasing
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
@@ -152,27 +169,33 @@ class DataAugmentation:
             transforms.RandomResizedCrop(size, scale=global_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.2)  # Increased color jitter strength
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.1),
             transforms.RandomSolarize(threshold=128, p=0.2),
+            transforms.RandomApply([transforms.RandomErasing(p=0.25, scale=(0.02, 0.33))], p=0.3),  # Add random erasing
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
         
-        # Local crops
+        # Local crops - stronger augmentation
         self.local_crops_number = local_crops_number
         self.local_transfo = transforms.Compose([
-            transforms.RandomResizedCrop(size, scale=local_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
+            # transforms.RandomResizedCrop(size, scale=local_crops_scale, interpolation=transforms.InterpolationMode.BICUBIC),
+            # transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomResizedCrop(size, scale=local_crops_scale),
             transforms.RandomHorizontalFlip(p=0.5),
             transforms.RandomApply([
-                transforms.ColorJitter(0.4, 0.4, 0.2, 0.1)
+                transforms.ColorJitter(0.4, 0.4, 0.4, 0.2)  # Increased color jitter strength
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
             transforms.RandomApply([transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0))], p=0.5),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.RandomApply([transforms.RandomErasing(p=0.25, scale=(0.02, 0.33))], p=0.3),  # Add random erasing
+            # transforms.ToTensor(),
+            # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            transforms.ToTensor(),  # Convert to tensor FIRST
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Then normalize
         ])
     
     def __call__(self, image):
@@ -184,28 +207,40 @@ class DataAugmentation:
         return crops
 
 
-def get_backbone(arch='vit_small', patch_size=16, img_size=96):
+def get_backbone(arch='vit_small', patch_size=16, img_size=96, drop_path_rate=0.0):
     """
     Create a backbone network. ViT recommended for DINO.
     For 96x96 images, we use smaller models to stay under 100M params.
+    
+    Args:
+        arch: Architecture name ('vit_tiny', 'vit_small', 'vit_base', 'resnet50')
+        patch_size: Patch size (not used for timm models, kept for compatibility)
+        img_size: Input image size
+        drop_path_rate: Stochastic depth rate (drop path rate). Recommended:
+            - 0.0-0.1 for ViT-tiny
+            - 0.1-0.15 for ViT-small
+            - 0.15-0.2 for ViT-base
     """
     if 'vit' in arch:
         # Using timm for ViT models
         if arch == 'vit_tiny':
             model = timm.create_model('vit_tiny_patch16_224', pretrained=False, 
-                                     img_size=img_size, num_classes=0)  # num_classes=0 removes head
+                                     img_size=img_size, num_classes=0,
+                                     drop_path_rate=drop_path_rate)
         elif arch == 'vit_small':
             model = timm.create_model('vit_small_patch16_224', pretrained=False,
-                                     img_size=img_size, num_classes=0)
+                                     img_size=img_size, num_classes=0,
+                                     drop_path_rate=drop_path_rate)
         elif arch == 'vit_base':
             model = timm.create_model('vit_base_patch16_224', pretrained=False,
-                                     img_size=img_size, num_classes=0)
+                                     img_size=img_size, num_classes=0,
+                                     drop_path_rate=drop_path_rate)
         else:
             raise ValueError(f"Unknown architecture: {arch}")
         
         embed_dim = model.embed_dim
     else:
-        # ResNet backbone alternative
+        # ResNet backbone alternative (stochastic depth not applicable)
         model = timm.create_model('resnet50', pretrained=False, num_classes=0)
         embed_dim = 2048
     

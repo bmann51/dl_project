@@ -78,10 +78,15 @@ class MultiCropWrapper(nn.Module):
         self.local_head = local_head
     
     def forward(self, x):
-        # For inference, return normalized backbone features
+        # Use backbone features only (don't use head)
         x = self.backbone(x)
-        x = F.normalize(x, dim=-1, p=2)  # NORMALIZE FOR COSINE DISTANCE
+        x = F.normalize(x, dim=-1, p=2)
         return x
+        # # Match training: use backbone + head
+        # x = self.backbone(x)
+        # x = self.head.mlp(x)  # Go through MLP to get bottleneck features
+        # x = F.normalize(x, dim=-1, p=2)  # Normalize bottleneck features
+        # return x  # Return 256-dim bottleneck features, NOT 768-dim backbone
 
 
 # ============================================================================

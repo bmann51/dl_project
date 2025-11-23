@@ -116,7 +116,8 @@ def main(args):
     # Data augmentation
     transform = DataAugmentation(
         global_crops_scale=(0.4, 1.0),
-        local_crops_scale=(0.05, 0.4),
+        #changed from .05
+        local_crops_scale=(0.2, 0.4),
         local_crops_number=args.local_crops_number,
         size=args.image_size
     )
@@ -289,7 +290,8 @@ if __name__ == '__main__':
     parser.add_argument('--image_size', default=96, type=int, help='Image size')
     parser.add_argument('--out_dim', default=8192, type=int,
                        help='Dimensionality of the DINO head output')
-    parser.add_argument('--bottleneck_dim', default=256, type=int,
+    # increased default from 256
+    parser.add_argument('--bottleneck_dim', default=512, type=int,
                        help='Dimensionality of bottleneck in projection head')
     parser.add_argument('--norm_last_layer', default=True, type=bool,
                        help='Whether to weight normalize the last layer')
