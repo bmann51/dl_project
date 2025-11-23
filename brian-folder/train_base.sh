@@ -1,0 +1,42 @@
+#!/bin/bash
+#SBATCH --job-name=dino_train
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=8
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --time=60:00:00
+#SBATCH --mem=64G
+#SBATCH --partition=a100_short
+#SBATCH --output=logs/train_base_%j.out
+#SBATCH --error=logs/train_base_%j.err
+
+# Load modules
+module load cuda/11.8
+
+# Activate environment
+source ~/.bashrc
+conda activate dino_new
+
+# Create logs directory
+mkdir -p logs
+
+# Run training
+# python train_dino.py \
+#     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
+#     --output_dir /gpfs/scratch/bm3772/checkpoints_base \
+#     --arch vit_base \
+#     --batch_size 64 \
+#     --epochs 100 \
+#     --num_workers 8 \
+#     --save_freq 10
+#     # --resume /gpfs/scratch/bm3772/checkpoints_base/checkpoint.pth
+
+
+python eval_dino.py \
+    --checkpoint /gpfs/scratch/bm3772/checkpoints_base/final_checkpoint.pth \
+    --arch vit_base \
+    --train_path /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data/train \
+    --test_path /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data/test \
+    --k 20
+
+    #./data/eval_public/test
