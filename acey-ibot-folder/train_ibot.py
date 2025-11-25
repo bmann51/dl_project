@@ -38,6 +38,16 @@ def autocast_context(fp16_enabled):
     return torch.cuda.amp.autocast()
 
 
+def get_vit_patch_size(backbone):
+    """Extract patch size from timm ViT backbone."""
+    if hasattr(backbone, "patch_embed") and hasattr(backbone.patch_embed, "patch_size"):
+        patch_size = backbone.patch_embed.patch_size
+        if isinstance(patch_size, (tuple, list)):
+            return patch_size[0]
+        return patch_size
+    return 16
+
+
 class UnlabeledImageDataset(Dataset):
     """
     Dataset for unlabeled pretraining images.
@@ -365,14 +375,21 @@ def main(args):
     if count_parameters(student) >= 100_000_000:
         print(f"WARNING: Model has {count_parameters(student):,} parameters (limit is 100M)")
     
+    patch_size = get_vit_patch_size(student_backbone)
+
     # Mask generator
     if args.mask_type == 'random':
         mask_generator = RandomMaskingGenerator(
-            args.image_size, mask_ratio=args.mask_ratio
+            args.image_size,
+            mask_ratio=args.mask_ratio,
+            patch_size=patch_size
         )
     elif args.mask_type == 'blockwise':
         mask_generator = BlockwiseMaskingGenerator(
-            args.image_size, mask_ratio=args.mask_ratio, block_size=args.block_size
+            args.image_size,
+            mask_ratio=args.mask_ratio,
+            block_size=args.block_size,
+            patch_size=patch_size
         )
     else:
         raise ValueError(f"Unknown mask type: {args.mask_type}")

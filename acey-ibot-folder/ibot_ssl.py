@@ -13,18 +13,22 @@ class RandomMaskingGenerator:
     Random masking generator for iBOT.
     Masks patches in a block-wise manner (similar to BEiT).
     """
-    def __init__(self, input_size, mask_ratio=0.4, min_num_patches=4):
+    def __init__(self, input_size, mask_ratio=0.4, min_num_patches=4, patch_size=16):
         """
         Args:
             input_size: Image size (e.g., 96)
             mask_ratio: Ratio of patches to mask (default: 0.4)
             min_num_patches: Minimum number of patches to keep unmasked
+            patch_size: Patch size of the ViT (default: 16)
         """
         if not isinstance(input_size, tuple):
             input_size = (input_size, input_size)
         
         self.height, self.width = input_size
-        self.num_patches = self.height * self.width
+        self.patch_size = patch_size
+        self.h_patches = self.height // self.patch_size
+        self.w_patches = self.width // self.patch_size
+        self.num_patches = self.h_patches * self.w_patches
         self.num_mask = int(mask_ratio * self.num_patches)
         self.min_num_patches = min_num_patches
         
@@ -55,7 +59,7 @@ class BlockwiseMaskingGenerator:
     Block-wise masking generator (more structured masking).
     """
     def __init__(self, input_size, mask_ratio=0.4, min_num_patches=4, 
-                 block_size=2, num_blocks=None):
+                 block_size=2, num_blocks=None, patch_size=16):
         """
         Args:
             input_size: Image size (e.g., 96)
@@ -63,12 +67,13 @@ class BlockwiseMaskingGenerator:
             min_num_patches: Minimum number of patches to keep unmasked
             block_size: Size of each block (in patches)
             num_blocks: Number of blocks to mask (if None, computed from mask_ratio)
+            patch_size: Patch size of the ViT (default: 16)
         """
         if not isinstance(input_size, tuple):
             input_size = (input_size, input_size)
         
         self.height, self.width = input_size
-        self.patch_size = 16  # Assuming patch size 16
+        self.patch_size = patch_size
         self.h_patches = self.height // self.patch_size
         self.w_patches = self.width // self.patch_size
         self.num_patches = self.h_patches * self.w_patches
