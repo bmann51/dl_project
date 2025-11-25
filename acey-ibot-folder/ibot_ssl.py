@@ -519,18 +519,19 @@ def get_backbone(arch='vit_small', patch_size=16, img_size=96, drop_path_rate=0.
     Create a backbone network (ViT).
     """
     if 'vit' in arch:
+        vit_kwargs = dict(
+            pretrained=False,
+            img_size=img_size,
+            num_classes=0,   # no classifier head
+            drop_path_rate=drop_path_rate,
+            global_pool=''   # keep patch + CLS tokens (needed for iBOT)
+        )
         if arch == 'vit_tiny':
-            model = timm.create_model('vit_tiny_patch16_224', pretrained=False, 
-                                     img_size=img_size, num_classes=0,
-                                     drop_path_rate=drop_path_rate)
+            model = timm.create_model('vit_tiny_patch16_224', **vit_kwargs)
         elif arch == 'vit_small':
-            model = timm.create_model('vit_small_patch16_224', pretrained=False,
-                                     img_size=img_size, num_classes=0,
-                                     drop_path_rate=drop_path_rate)
+            model = timm.create_model('vit_small_patch16_224', **vit_kwargs)
         elif arch == 'vit_base':
-            model = timm.create_model('vit_base_patch16_224', pretrained=False,
-                                     img_size=img_size, num_classes=0,
-                                     drop_path_rate=drop_path_rate)
+            model = timm.create_model('vit_base_patch16_224', **vit_kwargs)
         else:
             raise ValueError(f"Unknown architecture: {arch}")
         

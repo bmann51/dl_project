@@ -12,12 +12,30 @@ from tqdm import tqdm
 import argparse
 import json
 import csv
+from contextlib import nullcontext
 from ibot_ssl import (
     get_backbone, iBOTHead, iBOTTokenizer, MultiCropiBOTWrapper, iBOTLoss,
     DataAugmentation, cosine_scheduler, update_momentum,
     cancel_gradients_last_layer, count_parameters,
     RandomMaskingGenerator, BlockwiseMaskingGenerator
 )
+
+
+def create_grad_scaler():
+    """Handle newer and older AMP APIs."""
+    if hasattr(torch, "amp") and hasattr(torch.amp, "GradScaler"):
+        return torch.amp.GradScaler("cuda")
+    # Fallback for older torch versions
+    return torch.cuda.amp.GradScaler()
+
+
+def autocast_context(fp16_enabled):
+    """Return the correct autocast context manager."""
+    if not fp16_enabled:
+        return nullcontext()
+    if hasattr(torch, "amp") and hasattr(torch.amp, "autocast"):
+        return torch.amp.autocast("cuda")
+    return torch.cuda.amp.autocast()
 
 
 class UnlabeledImageDataset(Dataset):
@@ -147,7 +165,7 @@ def train_one_epoch(student, teacher, teacher_without_ddp, ibot_loss,
         student_mask = torch.from_numpy(mask).float().unsqueeze(0).repeat(batch_size, 1).cuda(non_blocking=True)
         
         # Forward pass
-        with torch.cuda.amp.autocast(fp16_scaler is not None):
+        with autocast_context(fp16_scaler is not None):
             # Teacher: full images (no masking)
             teacher_output, teacher_token_logits = teacher(
                 images[:2], mask=None, return_patch_tokens=True
@@ -426,7 +444,7 @@ def main(args):
     # Mixed precision training
     fp16_scaler = None
     if args.use_fp16:
-        fp16_scaler = torch.cuda.amp.GradScaler()
+        fp16_scaler = create_grad_scaler()
         print("Using mixed precision training")
     
     # Training loop
