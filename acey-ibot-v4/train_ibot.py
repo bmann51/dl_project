@@ -42,11 +42,11 @@ def get_patch_size(backbone, arch='vit_tiny'):
     """Extract patch size from backbone (ViT or CNN)."""
     if 'vit' in arch:
         # For ViT, extract from patch_embed
-    if hasattr(backbone, "patch_embed") and hasattr(backbone.patch_embed, "patch_size"):
-        patch_size = backbone.patch_embed.patch_size
-        if isinstance(patch_size, (tuple, list)):
-            return patch_size[0]
-        return patch_size
+        if hasattr(backbone, "patch_embed") and hasattr(backbone.patch_embed, "patch_size"):
+            patch_size = backbone.patch_embed.patch_size
+            if isinstance(patch_size, (tuple, list)):
+                return patch_size[0]
+            return patch_size
     # For CNN or default, return 16 (standard patch size for 96x96 images)
     return 16
 
