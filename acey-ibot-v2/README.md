@@ -16,15 +16,16 @@ This version addresses training instability issues with:
 1. **AdamW Optimizer** (instead of LARS) with conservative learning rates (0.0003-0.0005)
 2. **Reduced Weight Decay** (0.04→0.1, instead of 0.05→0.45)
 3. **Gradient Clipping** (max_norm=1.0) for training stability
-4. **Lower Mask Ratio** (0.3-0.35, instead of 0.4) for easier initial learning
-5. **Loss Computation Checks** to detect multiplication bugs and training issues
-6. **Loss Component Monitoring** for better debugging
+4. **Optimized Mask Ratio** (0.3-0.4, adjusted per variant) for balanced learning
+5. **KoLeo Loss Disabled** - Disabled to prevent explosion and simplify training (original iBOT doesn't use it)
+6. **Loss Computation Checks** to detect multiplication bugs and training issues
+7. **Loss Component Monitoring** for better debugging
 
 ## Training Scripts
 
 Three training variants are provided:
 
-- **`train_ibot_stable.sh`**: Conservative settings (lr=0.0003, mask_ratio=0.3, wd=0.04→0.1)
+- **`train_ibot_stable.sh`**: Conservative settings (lr=0.0003, mask_ratio=0.4, wd=0.04→0.1)
 - **`train_ibot_balanced.sh`**: Moderate settings (lr=0.0005, mask_ratio=0.35, wd=0.05→0.15)
 - **`train_ibot_peak_lr.sh`**: Peak LR schedule (warmup to 0.001, then decay)
 
@@ -166,20 +167,17 @@ Combines three loss components:
   6. Skip cases where teacher and student see the same view
 - **Formula:** `L_CLS = -sum(teacher_soft * log(student_soft))` (on CLS tokens)
 
-**C. KoLeo Regularization (from DINOv2)**
-- **Purpose:** Encourage feature diversity (prevent collapse)
-- **Process:**
-  1. Normalize teacher CLS features
-  2. Compute pairwise L2 distances between all features in batch
-  3. Apply negative log: `-log(pairwise_distances + eps)`
-  4. Average over all pairs (excluding self-distances)
-- **Formula:** `L_KoLeo = -mean(log(||f_i - f_j||^2 + eps))`
-- **Effect:** Encourages features to spread out in embedding space
+**C. KoLeo Regularization (from DINOv2) - DISABLED**
+- **Status:** Disabled by default (`koleo_weight=0.0`)
+- **Reason:** Original iBOT doesn't use KoLeo, and it was causing explosion issues
+- **Alternative:** Teacher centering in CLS loss already prevents collapse
+- **Note:** Can be re-enabled by setting `--koleo_weight > 0` if needed
 
 **Total Loss:**
 ```
 L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 ```
+(Note: KoLeo is disabled by default, so `w_KoLeo = 0`)
 
 **Loss Component Monitoring:**
 - Returns individual component losses for debugging
@@ -196,7 +194,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 3. **Compute loss:**
    - MIM loss on masked patches only
    - CLS loss on all crops
-   - KoLeo loss on teacher features
+   - KoLeo loss: Disabled (0.0)
 4. **Loss validation checks:**
    - Verify loss is in expected range (4-6 initially, not 12+)
    - Check component sum matches total loss
@@ -261,7 +259,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 6. Loss Computation:
    - MIM: Compare student vs teacher tokens on masked patches
    - CLS: Compare student vs teacher CLS on all crops
-   - KoLeo: Diversity loss on teacher CLS features
+   - KoLeo: Disabled (not computed)
    ↓
 7. Loss Validation:
    - Check loss range (should be 4-6 initially)
@@ -278,7 +276,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 1. **MIM learns local features:** Predicting masked patches forces understanding of patch-level semantics
 2. **Self-distillation learns global features:** CLS token consistency learns high-level semantics
 3. **Combined = best of both:** Local + global understanding
-4. **KoLeo prevents collapse:** Ensures diverse feature representations
+4. **Teacher centering prevents collapse:** CLS loss has centering mechanism (alternative to KoLeo)
 5. **Online tokenizer adapts:** Learns visual vocabulary specific to your data
 6. **Stable training:** Conservative hyperparameters prevent instability
 
@@ -290,7 +288,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
   - `iBOTTokenizer`: Online tokenizer - MLP mapping patches to discrete tokens
   - `iBOTHead`: Projection head - bottleneck architecture for CLS tokens
   - `MultiCropiBOTWrapper`: Model wrapper - handles crops, extracts CLS/tokens
-  - `iBOTLoss`: Combined loss - MIM + self-distillation + KoLeo (with component tracking)
+  - `iBOTLoss`: Combined loss - MIM + self-distillation (KoLeo disabled, with component tracking)
   - `LARS`: Layer-wise Adaptive Rate Scaling optimizer (optional)
   - `DataAugmentation`: Multi-crop augmentation (2 global + 6-8 local)
   - `cosine_scheduler`: Standard cosine LR schedule
@@ -363,7 +361,7 @@ python train_ibot.py \
 **Loss Weights:**
 - `--mim_loss_weight`: Weight for MIM loss (default: 1.0)
 - `--cls_loss_weight`: Weight for self-distillation loss (default: 1.0)
-- `--koleo_weight`: Weight for KoLeo regularization (default: 0.001)
+- `--koleo_weight`: Weight for KoLeo regularization (default: 0.0, disabled - original iBOT doesn't use it)
 
 **Tokenizer:**
 - `--num_tokens`: Vocabulary size for tokenizer (default: 8192)
@@ -485,7 +483,7 @@ These checks help catch the issues mentioned in feedback where "loss should star
 
 1. **Untied Heads**: Separate projection heads for global/local crops (better than tied)
 2. **Bottleneck Architecture**: Reduces overfitting in projection head
-3. **KoLeo Regularization**: Prevents feature collapse (from DINOv2)
+3. **KoLeo Regularization**: Disabled by default (original iBOT doesn't use it, teacher centering prevents collapse)
 4. **Online Tokenizer**: Learns visual vocabulary during training (no pre-training)
 5. **AdamW Optimizer**: Stable training with conservative learning rates
 6. **Multi-Crop Strategy**: 8-10 crops per image (2 global + 6-8 local) for robust learning
@@ -499,6 +497,7 @@ These checks help catch the issues mentioned in feedback where "loss should star
 - Reduced learning rates (0.0003-0.0005 vs 0.1)
 - Reduced weight decay (0.04→0.1 vs 0.05→0.45)
 - Added gradient clipping (max_norm=1.0)
-- Reduced mask ratio (0.3-0.35 vs 0.4)
+- Optimized mask ratio (0.3-0.4, adjusted per variant)
+- **Disabled KoLeo loss** - Original iBOT doesn't use it, prevents explosion issues
 - Added loss computation validation checks
 - Added loss component monitoring

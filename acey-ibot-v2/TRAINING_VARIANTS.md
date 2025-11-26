@@ -11,19 +11,22 @@ This folder contains 3 different training configurations optimized for **stable 
 **Key Settings**:
 - **Optimizer**: AdamW (not LARS)
 - **Learning rate: 0.0003** - Low base LR for stability
-- **Mask ratio: 0.3** ⬇️ (30% vs original 40%) - Easier learning task
+- **Mask ratio: 0.4** - Standard masking (prevents MIM collapse)
 - **Weight decay: 0.04 → 0.1** ⬇️ (vs original 0.05 → 0.45) - Much lower regularization
 - **Gradient clipping: 1.0** - Conservative clipping for stability
 - **MIM loss weight: 1.0** - Standard weight
 - **CLS loss weight: 1.0** - Standard weight
+- **KoLeo weight: 0.0** - Disabled (original iBOT doesn't use it)
 - **Local crops: 6** - Standard multi-crop augmentation
 - **Drop path rate: 0.2** - Moderate regularization
 
 **Justification**:
 - **Lower LR (0.0003)**: Prevents training instability (original LARS was going to 0.05, which is 100x higher)
-- **Lower mask ratio (0.3)**: Easier task initially, allows model to learn more gradually
+- **Standard mask ratio (0.4)**: Prevents MIM loss collapse to zero, maintains learning signal
 - **Lower weight decay (0.04→0.1)**: Original was ramping to 0.45 which is very aggressive
 - **Gradient clipping (1.0)**: Prevents gradient explosion, critical for stability
+- **KoLeo disabled (0.0)**: Original iBOT doesn't use it, prevents explosion issues
+- **Teacher centering**: CLS loss has centering which prevents collapse (alternative to KoLeo)
 - **AdamW**: More stable than LARS for this setup
 
 **Expected Outcomes**:
@@ -107,7 +110,8 @@ This folder contains 3 different training configurations optimized for **stable 
 | **Base LR** | 0.0003 | 0.0005 | 0.0003 |
 | **Peak LR** | N/A (uses base_lr) | N/A (uses base_lr) | **0.001** ⬆️ |
 | **LR Schedule** | Standard cosine | Standard cosine | **Peak LR schedule** ⬆️ |
-| **Mask Ratio** | 0.3 | **0.35** ⬆️ | 0.3 |
+| **Mask Ratio** | 0.4 | **0.35** ⬆️ | 0.3 |
+| **KoLeo Weight** | **0.0** (disabled) | **0.0** (disabled) | **0.0** (disabled) |
 | **Weight Decay Start** | 0.04 | **0.05** ⬆️ | 0.04 |
 | **Weight Decay End** | 0.1 | **0.15** ⬆️ | 0.1 |
 | **Gradient Clipping** | 1.0 | 1.0 | 1.0 |
@@ -161,16 +165,20 @@ All three variants include these stability improvements:
 2. **Lower Learning Rates** (0.0003-0.0005 vs 0.1) - Prevents instability
 3. **Reduced Weight Decay** (0.04→0.1 vs 0.05→0.45) - Less aggressive regularization
 4. **Gradient Clipping** (max_norm=1.0) - Prevents gradient explosion
-5. **Lower Mask Ratio** (0.3-0.35 vs 0.4) - Easier initial learning task
-6. **Loss Computation Checks** - Automatic validation to catch bugs
-7. **Loss Component Monitoring** - Better debugging and diagnostics
+5. **Optimized Mask Ratio** (0.3-0.4, adjusted per variant) - Balanced learning task
+6. **KoLeo Loss Disabled** - Original iBOT doesn't use it, prevents explosion issues
+7. **Loss Computation Checks** - Automatic validation to catch bugs
+8. **Loss Component Monitoring** - Better debugging and diagnostics
 
 ## Expected Loss Behavior
 
 With these improvements, you should see:
-- **Initial loss**: 4-6 (not 12+)
+- **Initial loss**: 4-6 (not 12+ or 17+)
 - **Decreasing trend**: Loss should decrease over time (not increase to 8+)
 - **Final loss**: 1-3 after training
 - **Stable training**: No sudden spikes or collapses
+- **MIM loss**: Should not collapse to 0 (should decrease from ~4-9 to ~0.1-2)
+- **CLS loss**: Should decrease over time (from ~6-8 to ~2-4)
+- **KoLeo loss**: Disabled (0.0) - not computed
 
 If you see loss > 10 initially or loss increasing, the validation checks will warn you!

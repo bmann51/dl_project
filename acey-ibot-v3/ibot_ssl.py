@@ -607,12 +607,19 @@ class iBOTLoss(nn.Module):
         
         # KoLeo loss: negative sum of log distances
         # This encourages features to be far apart
-        koleo_loss = -torch.sum(torch.log(valid_distances))
+        # Clip distances to prevent explosion when features collapse
+        # Use a minimum distance threshold to prevent log(very_small_value)
+        min_dist = 1e-4  # Minimum distance threshold
+        clipped_distances = torch.clamp(valid_distances, min=min_dist)
+        koleo_loss = -torch.sum(torch.log(clipped_distances))
         
         # Normalize by number of pairs
         num_pairs = mask.sum().float()
         if num_pairs > 0:
             koleo_loss = koleo_loss / num_pairs
+        
+        # Additional clipping to prevent extreme values
+        koleo_loss = torch.clamp(koleo_loss, max=10.0)
         
         return koleo_loss
     

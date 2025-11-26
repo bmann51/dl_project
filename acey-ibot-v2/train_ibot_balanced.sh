@@ -50,7 +50,7 @@ python train_ibot.py \
     --mask_type random \
     --mim_loss_weight 1.2 \
     --cls_loss_weight 1.0 \
-    --koleo_weight 0.001 \
+    --koleo_weight 0.0 \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16

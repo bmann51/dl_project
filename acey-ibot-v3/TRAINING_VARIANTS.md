@@ -59,7 +59,7 @@ This folder contains 3 different training configurations for **diverse explorati
 - **CLS loss weight: 1.0** - Standard weight
 - **Local crops: 8** - More augmentation diversity
 - **Drop path rate: 0.25** - More aggressive regularization
-- **KoLeo weight: 0.002** - Higher feature diversity
+- **KoLeo weight: 0.0** - Disabled (original iBOT doesn't use it)
 
 **Justification**:
 - **LARS**: Better for large batch training with high LR
@@ -147,7 +147,7 @@ This folder contains 3 different training configurations for **diverse explorati
 | **CLS Loss Weight** | 1.0 | 1.0 | 1.0 |
 | **Local Crops** | 6 | **8** ⬆️ | 6 |
 | **Drop Path Rate** | 0.2 | **0.25** ⬆️ | 0.2 |
-| **KoLeo Weight** | 0.001 | **0.002** ⬆️ | 0.001 |
+| **KoLeo Weight** | **0.0** (disabled) | **0.0** (disabled) | **0.0** (disabled) |
 
 ## Usage
 
@@ -207,12 +207,17 @@ You can run all 3 in parallel to compare results efficiently!
 ## Expected Loss Behavior
 
 With these configurations, you should see:
-- **Initial loss**: 4-6 (not 12+)
+- **Initial loss**: 4-6 (not 12+ or 17+)
 - **Decreasing trend**: Loss should decrease over time (not increase to 8+)
 - **Final loss**: 1-3 after training
 - **Stable training**: No sudden spikes or collapses
+- **MIM loss**: Should not collapse to 0 (should decrease from ~4-9 to ~0.1-2)
+- **CLS loss**: Should decrease over time (from ~6-8 to ~2-4)
+- **KoLeo loss**: Disabled (0.0) - not computed
 
 If you see loss > 10 initially or loss increasing, the validation checks will warn you!
+
+**Note**: KoLeo loss has been disabled (set to 0.0) because original iBOT doesn't use it and it was causing explosion issues. Teacher centering in CLS loss already prevents feature collapse.
 
 ## Competition Compliance
 

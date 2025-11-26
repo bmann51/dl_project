@@ -669,8 +669,8 @@ if __name__ == '__main__':
                        help='Weight for MIM loss')
     parser.add_argument('--cls_loss_weight', default=1.0, type=float,
                        help='Weight for self-distillation (CLS) loss')
-    parser.add_argument('--koleo_weight', default=0.001, type=float,
-                       help='Weight for KoLeo regularization (feature diversity)')
+    parser.add_argument('--koleo_weight', default=0.0, type=float,
+                       help='Weight for KoLeo regularization (feature diversity). Default: 0.0 (disabled - original iBOT doesn\'t use it)')
     parser.add_argument('--koleo_eps', default=1e-6, type=float,
                        help='Epsilon for KoLeo loss (prevents log(0))')
     

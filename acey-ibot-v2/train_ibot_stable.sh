@@ -45,11 +45,11 @@ python train_ibot.py \
     --bottleneck_dim 128 \
     --out_dim 4096 \
     --num_tokens 8192 \
-    --mask_ratio 0.3 \
+    --mask_ratio 0.4 \
     --mask_type random \
     --mim_loss_weight 1.0 \
     --cls_loss_weight 1.0 \
-    --koleo_weight 0.001 \
+    --koleo_weight 0.0 \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16

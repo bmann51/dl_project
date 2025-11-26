@@ -62,7 +62,7 @@ python train_ibot.py \
     --block_size 2 \
     --mim_loss_weight 1.5 \
     --cls_loss_weight 1.0 \
-    --koleo_weight 0.002 \
+    --koleo_weight 0.0 \
     --lars_trust_coefficient 0.001 \
     --lars_eta 0.001 \
     --momentum 0.9 \

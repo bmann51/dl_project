@@ -194,6 +194,16 @@ All architectures comply with competition requirements:
 - ✅ **Frozen encoder**: For evaluation (k-NN)
 - ✅ **Random initialization**: No pretrained weights
 
+## Training Stability Notes
+
+**KoLeo Loss Disabled**: KoLeo loss has been disabled (set to 0.0) because original iBOT doesn't use it and it was causing explosion issues. Teacher centering in CLS loss already prevents feature collapse.
+
+**Expected Loss Behavior**:
+- Initial loss: 4-6 (not 12+ or 17+)
+- MIM loss: Should not collapse to 0 (should decrease from ~4-9 to ~0.1-2)
+- CLS loss: Should decrease over time (from ~6-8 to ~2-4)
+- KoLeo loss: Disabled (0.0) - not computed
+
 ## CNN Implementation Details
 
 ### How CNN Works with iBOT
