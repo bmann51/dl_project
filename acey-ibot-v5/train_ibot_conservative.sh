@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ibot_convnext
+#SBATCH --job-name=ibot_conservative
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --ntasks-per-node=1
@@ -7,8 +7,8 @@
 #SBATCH --time=60:00:00
 #SBATCH --mem=64G
 #SBATCH --partition=a100_short
-#SBATCH --output=logs/train_ibot_convnext_%j.out
-#SBATCH --error=logs/train_ibot_convnext_%j.err
+#SBATCH --output=logs/train_ibot_conservative_%j.out
+#SBATCH --error=logs/train_ibot_conservative_%j.err
 
 # Load modules
 module load cuda/11.8
@@ -21,30 +21,28 @@ conda activate dino_new
 mkdir -p logs
 
 # ============================================================================
-# CONVNEXT EXPERIMENT: Modern CNN Backbone with iBOT
+# CONSERVATIVE CONFIGURATION: Stable AdamW Training
 # ============================================================================
-# Philosophy: Test modern CNN (ConvNeXt) vs ViT for iBOT
+# Philosophy: Stability and reliability over aggressive optimization
 # 
 # Key characteristics:
-# - ConvNeXt-Tiny backbone (~28M params, well under 100M limit)
-# - Modern CNN design with ViT-like structure
-# - CNN feature extractor converts feature maps to patch-like tokens
-# - Same iBOT training procedure (MIM + self-distillation)
-# - Conservative settings for stable training
+# - AdamW optimizer (more stable than LARS for this setup)
+# - Low learning rate (0.0003) for stable convergence
+# - Lower mask ratio (0.3) for easier learning task
+# - Random masking (simpler, more diverse patterns)
+# - Balanced loss weights (equal MIM and CLS)
+# - Conservative weight decay (0.04 -> 0.1)
+# - Gradient clipping (1.0) for stability
+# - ViT-tiny architecture (fast, well under 100M limit)
+# - Moderate augmentation (6 local crops)
 #
-# Why ConvNeXt:
-# - Modern CNN architecture (2022)
-# - ViT-like design principles applied to CNN
-# - Good balance between CNN and ViT
-# - More capacity than ResNet18
-#
-# Best for: Comparing modern CNN vs ViT architectures
+# Best for: Establishing baseline, stable training, avoiding instability
 # ============================================================================
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_convnext \
-    --arch convnext_tiny \
+    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_conservative \
+    --arch vit_tiny \
     --optimizer adamw \
     --batch_size 128 \
     --lr 0.0003 \
@@ -68,5 +66,5 @@ python train_ibot.py \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16
-    # --resume /gpfs/scratch/bm3772/checkpoints_ibot_convnext/checkpoint_XXXX.pth
+    # --resume /gpfs/scratch/bm3772/checkpoints_ibot_conservative/checkpoint_XXXX.pth
 

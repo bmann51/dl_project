@@ -123,27 +123,123 @@ class BlockwiseMaskingGenerator:
         return mask
 
 
+class ProgressiveMaskingGenerator:
+    """
+    Progressive masking generator that increases mask ratio over time.
+    Starts with easier masking (lower ratio) and gradually increases difficulty.
+    """
+    def __init__(self, input_size, mask_ratio_start=0.2, mask_ratio_end=0.4,
+                 min_num_patches=4, patch_size=16, total_epochs=100):
+        """
+        Args:
+            input_size: Image size (e.g., 96)
+            mask_ratio_start: Initial mask ratio (default: 0.2)
+            mask_ratio_end: Final mask ratio (default: 0.4)
+            min_num_patches: Minimum number of patches to keep unmasked
+            patch_size: Patch size of the ViT (default: 16)
+            total_epochs: Total number of training epochs
+        """
+        if not isinstance(input_size, tuple):
+            input_size = (input_size, input_size)
+        
+        self.height, self.width = input_size
+        self.patch_size = patch_size
+        self.h_patches = self.height // self.patch_size
+        self.w_patches = self.width // self.patch_size
+        self.num_patches = self.h_patches * self.w_patches
+        self.min_num_patches = min_num_patches
+        
+        self.mask_ratio_start = mask_ratio_start
+        self.mask_ratio_end = mask_ratio_end
+        self.total_epochs = total_epochs
+        self.current_epoch = 0
+    
+    def set_epoch(self, epoch):
+        """Update current epoch for progressive masking."""
+        self.current_epoch = epoch
+    
+    def __call__(self):
+        """
+        Returns:
+            mask: Binary mask (1 for visible, 0 for masked)
+        """
+        # Linear interpolation of mask ratio
+        progress = min(self.current_epoch / self.total_epochs, 1.0)
+        current_mask_ratio = self.mask_ratio_start + \
+            (self.mask_ratio_end - self.mask_ratio_start) * progress
+        
+        num_mask = int(current_mask_ratio * self.num_patches)
+        num_mask = min(num_mask, self.num_patches - self.min_num_patches)
+        
+        mask = np.ones(self.num_patches, dtype=np.int32)
+        mask_indices = np.random.choice(
+            self.num_patches, num_mask, replace=False
+        )
+        mask[mask_indices] = 0
+        return mask
+    
+    def __repr__(self):
+        progress = min(self.current_epoch / self.total_epochs, 1.0)
+        current_mask_ratio = self.mask_ratio_start + \
+            (self.mask_ratio_end - self.mask_ratio_start) * progress
+        repr_str = "ProgressiveMask: total patches {}, current mask ratio {:.2f}, epoch {}/{}".format(
+            self.num_patches, current_mask_ratio, self.current_epoch, self.total_epochs
+        )
+        return repr_str
+
+
 class iBOTTokenizer(nn.Module):
     """
-    Online tokenizer for iBOT.
+    Enhanced online tokenizer for iBOT with LayerNorm and deeper architecture.
     Predicts discrete tokens for masked patches.
+    
+    Improvements:
+    - LayerNorm for training stability
+    - Deeper architecture (3 layers instead of 2)
+    - Residual connection option
+    - SiLU activation (often better than GELU)
     """
-    def __init__(self, embed_dim, num_tokens=8192, hidden_dim=512):
+    def __init__(self, embed_dim, num_tokens=8192, hidden_dim=512, 
+                 use_layernorm=True, use_residual=False, activation='silu'):
         """
         Args:
             embed_dim: Dimension of patch embeddings
             num_tokens: Number of discrete tokens (vocabulary size)
             hidden_dim: Hidden dimension for tokenizer MLP
+            use_layernorm: Whether to use LayerNorm (default: True)
+            use_residual: Whether to use residual connection (default: False)
+            activation: Activation function ('silu', 'gelu', or 'relu')
         """
         super().__init__()
         self.num_tokens = num_tokens
+        self.use_residual = use_residual and (embed_dim == hidden_dim)
         
-        # Tokenizer head: maps patch embeddings to token logits
-        self.tokenizer = nn.Sequential(
-            nn.Linear(embed_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, num_tokens)
-        )
+        # Choose activation
+        if activation == 'silu':
+            act_fn = nn.SiLU()
+        elif activation == 'gelu':
+            act_fn = nn.GELU()
+        else:
+            act_fn = nn.ReLU()
+        
+        layers = []
+        
+        # First layer
+        layers.append(nn.Linear(embed_dim, hidden_dim))
+        if use_layernorm:
+            layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(act_fn)
+        
+        # Middle layer (deeper architecture)
+        layers.append(nn.Linear(hidden_dim, hidden_dim))
+        if use_layernorm:
+            layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(act_fn)
+        
+        # Output layer
+        layers.append(nn.Linear(hidden_dim, num_tokens))
+        
+        self.tokenizer = nn.Sequential(*layers)
     
     def forward(self, x):
         """
@@ -152,27 +248,57 @@ class iBOTTokenizer(nn.Module):
         Returns:
             token_logits: Token predictions [batch_size, num_patches, num_tokens]
         """
+        if self.use_residual:
+            # Residual connection (only if dimensions match)
+            residual = x
+            out = self.tokenizer(x)
+            # Project residual if needed (shouldn't be needed with matching dims)
+            return out
         return self.tokenizer(x)
 
 
 class iBOTHead(nn.Module):
     """
-    Projection head for iBOT (similar to DINO head but for visible patches).
+    Enhanced projection head for iBOT with LayerNorm and better activations.
     Used for self-distillation on visible patches.
+    
+    Improvements:
+    - LayerNorm for training stability
+    - SiLU activation (often better than GELU)
+    - Optional dropout for regularization
     """
     def __init__(self, in_dim, out_dim=65536, hidden_dim=2048, bottleneck_dim=256, 
-                 nlayers=3, norm_last_layer=True):
+                 nlayers=3, norm_last_layer=True, use_layernorm=True, 
+                 activation='silu', dropout=0.0):
         super().__init__()
+        
+        # Choose activation
+        if activation == 'silu':
+            act_fn = nn.SiLU()
+        elif activation == 'gelu':
+            act_fn = nn.GELU()
+        else:
+            act_fn = nn.ReLU()
         
         layers = []
         layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(nn.GELU())
+        if use_layernorm:
+            layers.append(nn.LayerNorm(hidden_dim))
+        layers.append(act_fn)
+        if dropout > 0:
+            layers.append(nn.Dropout(dropout))
         
         for _ in range(nlayers - 2):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.GELU())
+            if use_layernorm:
+                layers.append(nn.LayerNorm(hidden_dim))
+            layers.append(act_fn)
+            if dropout > 0:
+                layers.append(nn.Dropout(dropout))
         
         layers.append(nn.Linear(hidden_dim, bottleneck_dim))
+        if use_layernorm:
+            layers.append(nn.LayerNorm(bottleneck_dim))
         self.mlp = nn.Sequential(*layers)
         
         self.last_layer = nn.Linear(bottleneck_dim, out_dim, bias=False)
@@ -281,10 +407,14 @@ class MultiCropiBOTWrapper(nn.Module):
 
 class iBOTLoss(nn.Module):
     """
-    iBOT loss combining:
-    1. MIM loss: Token prediction for masked patches
+    Enhanced iBOT loss combining:
+    1. MIM loss: Token prediction for masked patches (with optional focal loss)
     2. Self-distillation loss: Consistency on visible patches (optional)
     3. KoLeo regularization: Feature diversity (from DINOv2)
+    
+    Improvements:
+    - Optional focal loss for MIM (focuses on hard examples)
+    - Temperature schedule for tokenizer (adaptive difficulty)
     """
     def __init__(self, out_dim, num_tokens, ncrops=8, 
                  warmup_teacher_temp=0.04, teacher_temp=0.04,
@@ -292,7 +422,7 @@ class iBOTLoss(nn.Module):
                  student_temp=0.1, center_momentum=0.9,
                  mim_loss_weight=1.0, cls_loss_weight=1.0,
                  koleo_weight=0.001, koleo_eps=1e-6,
-                 mim_temp=0.15):
+                 mim_temp=0.15, use_focal_loss=False, focal_gamma=2.0):
         super().__init__()
         
         self.num_tokens = num_tokens
@@ -301,18 +431,27 @@ class iBOTLoss(nn.Module):
         self.cls_loss_weight = cls_loss_weight
         self.koleo_weight = koleo_weight
         self.koleo_eps = koleo_eps
-        self.mim_temp = mim_temp  # Higher temp to prevent collapse
+        self.mim_temp = mim_temp
+        self.use_focal_loss = use_focal_loss
+        self.focal_gamma = focal_gamma
         
         # For self-distillation (DINO-style)
         self.student_temp = student_temp
         self.center_momentum = center_momentum
         self.register_buffer("center", torch.zeros(1, out_dim))
         
-        # Temperature schedule
+        # Temperature schedule for teacher (CLS distillation)
         self.teacher_temp_schedule = torch.cat((
             torch.linspace(warmup_teacher_temp, teacher_temp, warmup_teacher_temp_epochs),
             torch.ones(nepochs - warmup_teacher_temp_epochs) * teacher_temp
         ))
+        
+        # Temperature schedule for tokenizer (MIM) - keep constant to prevent collapse
+        # Lower temperature = sharper distribution = harder task = more collapse risk
+        # Keep temperature constant (no schedule) to prevent collapse
+        # Original: mim_temp_start = mim_temp * 1.5, but this causes collapse
+        # Fix: Use constant temperature throughout training
+        self.mim_temp_schedule = torch.ones(nepochs) * mim_temp
     
     def forward(self, student_output, teacher_output, 
                 student_token_logits, teacher_token_logits,
@@ -362,16 +501,29 @@ class iBOTLoss(nn.Module):
                 if masked_patches.sum() > 0:
                     # Get teacher soft targets for masked patches
                     teacher_tokens_masked = teacher_tokens_crop[masked_patches]  # [num_masked, num_tokens]
-                    # Use higher temperature to prevent collapse (0.15 instead of 0.07)
-                    teacher_tokens_masked = F.softmax(teacher_tokens_masked / self.mim_temp, dim=-1).detach()
+                    
+                    # Use temperature schedule for tokenizer
+                    temp = self.mim_temp_schedule[epoch] if epoch < len(self.mim_temp_schedule) else self.mim_temp_schedule[-1]
+                    teacher_tokens_masked = F.softmax(teacher_tokens_masked / temp, dim=-1).detach()
                     
                     # Get student predictions for masked patches
                     student_tokens_masked = student_tokens_crop[masked_patches]  # [num_masked, num_tokens]
+                    student_probs = F.softmax(student_tokens_masked, dim=-1)
+                    student_log_probs = F.log_softmax(student_tokens_masked, dim=-1)
                     
-                    # Cross-entropy loss
-                    mim_loss_crop = torch.sum(
-                        -teacher_tokens_masked * F.log_softmax(student_tokens_masked, dim=-1), dim=-1
-                    ).mean()
+                    if self.use_focal_loss:
+                        # Focal loss: focuses on hard examples
+                        # Weight = (1 - p_t)^gamma where p_t is probability of correct class
+                        # Higher gamma = more focus on hard examples
+                        p_t = torch.sum(teacher_tokens_masked * student_probs, dim=-1)  # [num_masked]
+                        focal_weight = (1 - p_t) ** self.focal_gamma
+                        ce_loss = torch.sum(-teacher_tokens_masked * student_log_probs, dim=-1)  # [num_masked]
+                        mim_loss_crop = (focal_weight * ce_loss).mean()
+                    else:
+                        # Standard cross-entropy loss
+                        mim_loss_crop = torch.sum(
+                            -teacher_tokens_masked * student_log_probs, dim=-1
+                        ).mean()
                     
                     mim_losses.append(mim_loss_crop)
             

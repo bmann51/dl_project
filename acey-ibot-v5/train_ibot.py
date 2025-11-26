@@ -38,16 +38,13 @@ def autocast_context(fp16_enabled):
     return torch.cuda.amp.autocast()
 
 
-def get_patch_size(backbone, arch='vit_tiny'):
-    """Extract patch size from backbone (ViT or CNN)."""
-    if 'vit' in arch:
-        # For ViT, extract from patch_embed
-        if hasattr(backbone, "patch_embed") and hasattr(backbone.patch_embed, "patch_size"):
-            patch_size = backbone.patch_embed.patch_size
-            if isinstance(patch_size, (tuple, list)):
-                return patch_size[0]
-            return patch_size
-    # For CNN or default, return 16 (standard patch size for 96x96 images)
+def get_vit_patch_size(backbone):
+    """Extract patch size from timm ViT backbone."""
+    if hasattr(backbone, "patch_embed") and hasattr(backbone.patch_embed, "patch_size"):
+        patch_size = backbone.patch_embed.patch_size
+        if isinstance(patch_size, (tuple, list)):
+            return patch_size[0]
+        return patch_size
     return 16
 
 
@@ -451,7 +448,7 @@ def main(args):
         print(f"⚠️  WARNING: Total model has {total_params:,} parameters")
         print("   (Note: Assignment only restricts backbone, not total model)")
     
-    patch_size = get_patch_size(student_backbone, args.arch)
+    patch_size = get_vit_patch_size(student_backbone)
 
     # Mask generator
     if args.mask_type == 'random':
@@ -641,11 +638,8 @@ if __name__ == '__main__':
     
     # Model parameters
     parser.add_argument('--arch', default='vit_tiny', type=str,
-                       choices=['vit_tiny', 'vit_small', 'vit_base',
-                               'resnet18', 'resnet34', 'resnet50',
-                               'efficientnet_b0', 'efficientnet_b1',
-                               'convnext_tiny', 'convnext_small'],
-                       help='Architecture (ViT or CNN)')
+                       choices=['vit_tiny', 'vit_small', 'vit_base'],
+                       help='Architecture')
     parser.add_argument('--image_size', default=96, type=int, help='Image size')
     parser.add_argument('--out_dim', default=8192, type=int,
                        help='Dimensionality of the iBOT head output')

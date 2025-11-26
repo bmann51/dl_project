@@ -468,7 +468,8 @@ def main(args):
         mim_loss_weight=args.mim_loss_weight,
         cls_loss_weight=args.cls_loss_weight,
         koleo_weight=args.koleo_weight,
-        koleo_eps=args.koleo_eps
+        koleo_eps=args.koleo_eps,
+        mim_temp=args.mim_temp  # Higher temp to prevent collapse
     ).to(device)
     
     # Optimizer - LARS for large batch training
@@ -669,6 +670,8 @@ if __name__ == '__main__':
                        help='Number of epochs for teacher temperature warmup')
     parser.add_argument('--student_temp', default=0.1, type=float,
                        help='Student temperature')
+    parser.add_argument('--mim_temp', default=0.15, type=float,
+                       help='MIM tokenizer temperature (higher = softer targets, prevents collapse)')
     
     # Training parameters
     parser.add_argument('--momentum_teacher', default=0.996, type=float,

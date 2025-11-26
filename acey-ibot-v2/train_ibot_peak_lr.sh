@@ -52,6 +52,7 @@ python train_ibot.py \
     --mim_loss_weight 1.0 \
     --cls_loss_weight 1.0 \
     --koleo_weight 0.0 \
+    --mim_temp 0.15 \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16

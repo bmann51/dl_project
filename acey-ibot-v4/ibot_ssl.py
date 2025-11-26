@@ -422,7 +422,7 @@ class iBOTLoss(nn.Module):
                  student_temp=0.1, center_momentum=0.9,
                  mim_loss_weight=1.0, cls_loss_weight=1.0,
                  koleo_weight=0.001, koleo_eps=1e-6,
-                 mim_temp=0.07, use_focal_loss=False, focal_gamma=2.0):
+                 mim_temp=0.15, use_focal_loss=False, focal_gamma=2.0):
         super().__init__()
         
         self.num_tokens = num_tokens
@@ -446,14 +446,12 @@ class iBOTLoss(nn.Module):
             torch.ones(nepochs - warmup_teacher_temp_epochs) * teacher_temp
         ))
         
-        # Temperature schedule for tokenizer (MIM) - can warmup from higher to lower
-        # Lower temperature = sharper distribution = harder task
-        mim_temp_start = mim_temp * 1.5  # Start easier
-        mim_temp_end = mim_temp  # End at target
-        self.mim_temp_schedule = torch.cat((
-            torch.linspace(mim_temp_start, mim_temp_end, warmup_teacher_temp_epochs),
-            torch.ones(nepochs - warmup_teacher_temp_epochs) * mim_temp_end
-        ))
+        # Temperature schedule for tokenizer (MIM) - keep constant to prevent collapse
+        # Lower temperature = sharper distribution = harder task = more collapse risk
+        # Keep temperature constant (no schedule) to prevent collapse
+        # Original: mim_temp_start = mim_temp * 1.5, but this causes collapse
+        # Fix: Use constant temperature throughout training
+        self.mim_temp_schedule = torch.ones(nepochs) * mim_temp
     
     def forward(self, student_output, teacher_output, 
                 student_token_logits, teacher_token_logits,
