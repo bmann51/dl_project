@@ -43,8 +43,8 @@ mkdir -p logs
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints/v5/checkpoints_ibot_feedback \
-    --arch vit_small \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v7/checkpoints_ibot_feedback_7 \
+    --arch vit_base \
     --optimizer adamw \
     --batch_size 96 \
     --lr 0.0003 \

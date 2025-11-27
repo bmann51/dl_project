@@ -41,7 +41,7 @@ mkdir -p logs
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints/v5/checkpoints_ibot_aggressive \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v5/checkpoints_ibot_aggressive_5 \
     --arch vit_small \
     --optimizer lars \
     --batch_size 128 \

@@ -26,7 +26,7 @@ mkdir -p logs
 # - Standard regularization
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v1 \
+    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v1_1 \
     --arch vit_tiny \
     --optimizer lars \
     --batch_size 128 \

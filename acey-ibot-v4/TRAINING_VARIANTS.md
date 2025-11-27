@@ -4,7 +4,7 @@ This folder contains training configurations for **architecture experiments**, c
 
 ---
 
-## ResNet18 Experiment (`train_ibot_resnet.sh`)
+## ResNet18 Experiment (`train_ibot_resnet_4.sh`)
 
 **Philosophy**: Test classic CNN backbone (ResNet18) vs ViT for iBOT
 
@@ -39,7 +39,7 @@ This folder contains training configurations for **architecture experiments**, c
 
 ---
 
-## ConvNeXt-Tiny Experiment (`train_ibot_convnext.sh`)
+## ConvNeXt-Tiny Experiment (`train_ibot_convnext_4.sh`)
 
 **Philosophy**: Test modern CNN backbone (ConvNeXt) vs ViT for iBOT
 
@@ -121,10 +121,10 @@ This folder contains training configurations for **architecture experiments**, c
 Run architecture experiments:
 ```bash
 # ResNet18 (classic CNN baseline)
-sbatch train_ibot_resnet.sh
+sbatch train_ibot_resnet_4.sh
 
 # ConvNeXt-Tiny (modern CNN)
-sbatch train_ibot_convnext.sh
+sbatch train_ibot_convnext_4.sh
 
 # For ViT baseline, use scripts from acey-ibot-v3
 ```

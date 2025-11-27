@@ -25,9 +25,9 @@ This version addresses training instability issues with:
 
 Three training variants are provided:
 
-- **`train_ibot_stable.sh`**: Conservative settings (lr=0.0003, mask_ratio=0.4, wd=0.04→0.1)
-- **`train_ibot_balanced.sh`**: Moderate settings (lr=0.0005, mask_ratio=0.35, wd=0.05→0.15)
-- **`train_ibot_peak_lr.sh`**: Peak LR schedule (warmup to 0.001, then decay)
+- **`train_ibot_stable_2.sh`**: Conservative settings (lr=0.0003, mask_ratio=0.4, wd=0.04→0.1)
+- **`train_ibot_balanced_2.sh`**: Moderate settings (lr=0.0005, mask_ratio=0.35, wd=0.05→0.15)
+- **`train_ibot_peak_lr_2.sh`**: Peak LR schedule (warmup to 0.001, then decay)
 
 See `TRAINING_VARIANTS.md` for detailed comparison.
 
@@ -301,7 +301,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
   - Support for both AdamW and LARS optimizers
 
 - `eval_ibot.py`: Evaluation script (k-NN on frozen features)
-- `train_ibot_stable.sh`, `train_ibot_balanced.sh`, `train_ibot_peak_lr.sh`: SLURM training scripts (3 variants)
+- `train_ibot_stable_2.sh`, `train_ibot_balanced_2.sh`, `train_ibot_peak_lr_2.sh`: SLURM training scripts (3 variants)
 - `requirements.txt`: Dependencies
 - `TRAINING_VARIANTS.md`: Detailed comparison of the 3 training variants
 
@@ -311,13 +311,13 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 
 ```bash
 # Stable configuration (recommended starting point)
-sbatch train_ibot_stable.sh
+sbatch train_ibot_stable_2.sh
 
 # Balanced configuration (moderate settings)
-sbatch train_ibot_balanced.sh
+sbatch train_ibot_balanced_2.sh
 
 # Peak LR configuration (follows feedback exactly)
-sbatch train_ibot_peak_lr.sh
+sbatch train_ibot_peak_lr_2.sh
 ```
 
 Or run directly:

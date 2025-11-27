@@ -31,7 +31,7 @@ This folder contains an iBOT (Image BERT Pre-Training with Online Tokenizer) imp
 
 The main entry point in this folder is:
 
-- `liberal.sh`: **macey v6 “liberal” configuration** (same hyperparameters as the v6 optimized conservative config).
+- `liberal_6.sh`: **macey v6 "liberal" configuration** (same hyperparameters as the v6 optimized conservative config).
 
 Key hyperparameters in this script:
 
@@ -69,7 +69,7 @@ This keeps the **overall character of the v5 conservative config** (small model,
     - Loss sanity checks as in v5.
 - `check_parameters.py`:
   - Verifies ViT backbone parameters are `< 100M` (same constraint as previous versions).
-- `liberal.sh`:
+- `liberal_6.sh`:
   - macey v6 “liberal” configuration (see above).
 - `requirements.txt`:
   - Dependencies (same as v5/v6).
@@ -79,7 +79,7 @@ This keeps the **overall character of the v5 conservative config** (small model,
 From this folder:
 
 ```bash
-sbatch liberal.sh
+sbatch liberal_6.sh
 ```
 
 Or directly:

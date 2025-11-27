@@ -36,8 +36,8 @@ iBOT combines:
 
 Architecture experiment scripts for comparing CNN vs ViT:
 
-- **`train_ibot_resnet.sh`**: ResNet18 experiment (classic CNN baseline, ~11M params)
-- **`train_ibot_convnext.sh`**: ConvNeXt-Tiny experiment (modern CNN, ~28M params)
+- **`train_ibot_resnet_4.sh`**: ResNet18 experiment (classic CNN baseline, ~11M params)
+- **`train_ibot_convnext_4.sh`**: ConvNeXt-Tiny experiment (modern CNN, ~28M params)
 
 **Note**: For ViT baseline experiments, use scripts from `acey-ibot-v3` folder.
 
@@ -377,7 +377,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
   - Support for both AdamW and LARS optimizers
 
 - `eval_ibot.py`: Evaluation script (k-NN on frozen features)
-- `train_ibot_resnet.sh`, `train_ibot_convnext.sh`: SLURM training scripts for CNN architecture experiments
+- `train_ibot_resnet_4.sh`, `train_ibot_convnext_4.sh`: SLURM training scripts for CNN architecture experiments
 - `requirements.txt`: Dependencies
 - `TRAINING_VARIANTS.md`: Detailed comparison of architecture experiments
 
@@ -387,10 +387,10 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 
 ```bash
 # ResNet18 experiment (classic CNN baseline)
-sbatch train_ibot_resnet.sh
+sbatch train_ibot_resnet_4.sh
 
 # ConvNeXt-Tiny experiment (modern CNN)
-sbatch train_ibot_convnext.sh
+sbatch train_ibot_convnext_4.sh
 
 # For ViT baseline, use scripts from acey-ibot-v3 folder
 ```

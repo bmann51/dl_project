@@ -28,9 +28,10 @@ mkdir -p logs
 # Key characteristics:
 # - AdamW optimizer (more stable than LARS for this setup)
 # - Low learning rate (0.0003) for stable convergence
-# - Lower mask ratio (0.3) for easier learning task
-# - Random masking (simpler, more diverse patterns)
-# - Balanced loss weights (equal MIM and CLS)
+# - Progressive masking (0.25 → 0.40) to prevent early collapse, maintain signal later
+# - Temperature scheduling (0.20 → 0.12) for soft early, sharp later
+# - Higher MIM loss weight (2.0x) to maintain strong signal
+# - Entropy regularization (0.1) to encourage diverse predictions
 # - Conservative weight decay (0.04 -> 0.1)
 # - Gradient clipping (1.0) for stability
 # - ViT-tiny architecture (fast, well under 100M limit)
@@ -41,8 +42,8 @@ mkdir -p logs
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints/v5/checkpoints_ibot_conservative \
-    --arch vit_small \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v8/checkpoints_ibot_conservative_8 \
+    --arch vit_base \
     --optimizer adamw \
     --batch_size 128 \
     --lr 0.0003 \
@@ -57,12 +58,15 @@ python train_ibot.py \
     --bottleneck_dim 128 \
     --out_dim 4096 \
     --num_tokens 8192 \
-    --mask_ratio 0.3 \
-    --mask_type random \
-    --mim_loss_weight 1.0 \
+    --mask_type progressive \
+    --mask_ratio_start 0.25 \
+    --mask_ratio_end 0.40 \
+    --mim_loss_weight 2.0 \
     --cls_loss_weight 1.0 \
     --koleo_weight 0.0 \
-    --mim_temp 0.15 \
+    --mim_temp_start 0.20 \
+    --mim_temp_end 0.12 \
+    --entropy_weight 0.1 \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16

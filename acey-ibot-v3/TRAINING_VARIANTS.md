@@ -4,7 +4,7 @@ This folder contains 3 different training configurations for **diverse explorati
 
 ---
 
-## Conservative Configuration (`train_ibot_conservative.sh`)
+## Conservative Configuration (`train_ibot_conservative_3.sh`)
 
 **Philosophy**: Stability and reliability over aggressive optimization
 
@@ -42,7 +42,7 @@ This folder contains 3 different training configurations for **diverse explorati
 
 ---
 
-## Aggressive Configuration (`train_ibot_aggressive.sh`)
+## Aggressive Configuration (`train_ibot_aggressive_3.sh`)
 
 **Philosophy**: Push the limits with larger model and aggressive settings
 
@@ -84,7 +84,7 @@ This folder contains 3 different training configurations for **diverse explorati
 
 ---
 
-## Feedback Configuration (`train_ibot_feedback.sh`)
+## Feedback Configuration (`train_ibot_feedback_3.sh`)
 
 **Philosophy**: Strictly follow training feedback recommendations exactly
 
@@ -153,26 +153,26 @@ This folder contains 3 different training configurations for **diverse explorati
 
 Run any variant:
 ```bash
-sbatch train_ibot_conservative.sh    # Stable baseline
-sbatch train_ibot_aggressive.sh      # High-capacity exploration
-sbatch train_ibot_feedback.sh        # Follows feedback exactly
+sbatch train_ibot_conservative_3.sh    # Stable baseline
+sbatch train_ibot_aggressive_3.sh      # High-capacity exploration
+sbatch train_ibot_feedback_3.sh        # Follows feedback exactly
 ```
 
 ## Which One to Use?
 
-### Start with Conservative (`train_ibot_conservative.sh`)
+### Start with Conservative (`train_ibot_conservative_3.sh`)
 - **Best starting point** - Most stable, reliable baseline
 - Conservative settings prevent instability
 - Lowest risk of training collapse
 - Use if you want a safe, reliable configuration
 
-### Try Aggressive (`train_ibot_aggressive.sh`) if:
+### Try Aggressive (`train_ibot_aggressive_3.sh`) if:
 - Conservative config works well and you want to explore capacity
 - You want faster training (LARS with high LR)
 - You want to emphasize local features (higher MIM weight, blockwise masking)
 - You want to use a larger model (ViT-small)
 
-### Use Feedback (`train_ibot_feedback.sh`) if:
+### Use Feedback (`train_ibot_feedback_3.sh`) if:
 - **You want to follow feedback exactly** - Implements all 7 recommendations
 - Previous training was unstable
 - You want the most stable configuration

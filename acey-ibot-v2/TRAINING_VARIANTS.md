@@ -4,7 +4,7 @@ This folder contains 3 different training configurations optimized for **stable 
 
 ---
 
-## Stable Configuration (`train_ibot_stable.sh`)
+## Stable Configuration (`train_ibot_stable_2.sh`)
 
 **Philosophy**: Conservative settings for maximum stability - follows feedback recommendations closely
 
@@ -41,7 +41,7 @@ This folder contains 3 different training configurations optimized for **stable 
 
 ---
 
-## Balanced Configuration (`train_ibot_balanced.sh`)
+## Balanced Configuration (`train_ibot_balanced_2.sh`)
 
 **Philosophy**: Moderate settings - slightly more aggressive but still stable
 
@@ -73,7 +73,7 @@ This folder contains 3 different training configurations optimized for **stable 
 
 ---
 
-## Peak LR Configuration (`train_ibot_peak_lr.sh`)
+## Peak LR Configuration (`train_ibot_peak_lr_2.sh`)
 
 **Philosophy**: Follows feedback's peak LR recommendation exactly - warmup to peak, then decay
 
@@ -124,26 +124,26 @@ This folder contains 3 different training configurations optimized for **stable 
 
 Run any variant:
 ```bash
-sbatch train_ibot_stable.sh    # Conservative, most stable
-sbatch train_ibot_balanced.sh  # Moderate, faster learning
-sbatch train_ibot_peak_lr.sh  # Peak LR schedule
+sbatch train_ibot_stable_2.sh    # Conservative, most stable
+sbatch train_ibot_balanced_2.sh  # Moderate, faster learning
+sbatch train_ibot_peak_lr_2.sh  # Peak LR schedule
 ```
 
 ## Which One to Use?
 
-### Start with Stable (`train_ibot_stable.sh`)
+### Start with Stable (`train_ibot_stable_2.sh`)
 - **Best starting point** - Most conservative, most stable
 - Follows feedback recommendations closely
 - Lowest risk of training instability
 - Use if previous training was unstable
 
-### Try Balanced (`train_ibot_balanced.sh`) if:
+### Try Balanced (`train_ibot_balanced_2.sh`) if:
 - Stable config works well and you want potentially better performance
 - You want slightly faster training
 - You want to emphasize local/patch-level features (higher MIM weight)
 - You want more augmentation diversity (8 local crops)
 
-### Try Peak LR (`train_ibot_peak_lr.sh`) if:
+### Try Peak LR (`train_ibot_peak_lr_2.sh`) if:
 - You want to follow feedback's peak LR recommendation exactly
 - You want faster initial learning with stable later training
 - You want to experiment with the peak LR schedule

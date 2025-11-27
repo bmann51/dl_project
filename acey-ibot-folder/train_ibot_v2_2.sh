@@ -27,7 +27,7 @@ mkdir -p logs
 # - Stronger regularization (higher drop_path_rate)
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v2 \
+    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v2_2 \
     --arch vit_tiny \
     --optimizer lars \
     --batch_size 128 \

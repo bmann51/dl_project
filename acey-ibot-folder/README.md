@@ -256,7 +256,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 
 - `train_ibot.py`: Training script with full training loop
 - `eval_ibot.py`: Evaluation script (k-NN on frozen features)
-- `train_ibot_v1.sh`, `v2.sh`, `v3.sh`: SLURM training scripts (3 variants)
+- `train_ibot_v1_1.sh`, `train_ibot_v2_2.sh`, `train_ibot_v3_3.sh`: SLURM training scripts (3 variants)
 - `requirements.txt`: Dependencies
 - `TRAINING_VARIANTS.md`: Detailed comparison of the 3 training variants
 

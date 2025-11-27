@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ibot_conservative
+#SBATCH --job-name=ibot_feedback
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --ntasks-per-node=1
@@ -7,8 +7,8 @@
 #SBATCH --time=60:00:00
 #SBATCH --mem=64G
 #SBATCH --partition=a100_short
-#SBATCH --output=logs/train_ibot_conservative_%j.out
-#SBATCH --error=logs/train_ibot_conservative_%j.err
+#SBATCH --output=logs/train_ibot_feedback_%j.out
+#SBATCH --error=logs/train_ibot_feedback_%j.err
 
 # Load modules
 module load cuda/11.8
@@ -21,31 +21,34 @@ conda activate dino_new
 mkdir -p logs
 
 # ============================================================================
-# CONSERVATIVE CONFIGURATION: Stable AdamW Training
+# FEEDBACK CONFIGURATION: Strictly Follows Training Feedback
 # ============================================================================
-# Philosophy: Stability and reliability over aggressive optimization
+# Philosophy: Follow feedback recommendations exactly for stable training
 # 
-# Key characteristics:
-# - AdamW optimizer (more stable than LARS for this setup)
-# - Low learning rate (0.0003) for stable convergence
-# - Lower mask ratio (0.3) for easier learning task
-# - Random masking (simpler, more diverse patterns)
-# - Balanced loss weights (equal MIM and CLS)
-# - Conservative weight decay (0.04 -> 0.1)
-# - Gradient clipping (1.0) for stability
-# - ViT-tiny architecture (fast, well under 100M limit)
-# - Moderate augmentation (6 local crops)
+# This configuration strictly implements all feedback recommendations:
+# 1. Lower learning rate: base_lr=0.0003, max_lr=0.001 (peak after warmup)
+# 2. Reduced weight decay: 0.04 -> 0.1 (not ramping to 0.4+)
+# 3. Gradient clipping: max_norm=1.0 (conservative)
+# 4. Smaller batch size: 96 (down from 128 for more stable updates)
+# 5. Lower mask ratio: 0.3 (easier learning task)
+# 6. Loss monitoring: Built into training script
+# 7. AdamW optimizer (not LARS - LARS was going to 0.05 which is 50x higher)
 #
-# Best for: Establishing baseline, stable training, avoiding instability
+# Expected loss behavior:
+# - Should start around 4-6 and decrease to 1-3
+# - NOT start at 12 and increase to 8+
+#
+# Best for: Following feedback exactly, most stable training
 # ============================================================================
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints/v3/checkpoints_ibot_conservative \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v3/checkpoints_ibot_feedback_3 \
     --arch vit_tiny \
     --optimizer adamw \
-    --batch_size 128 \
+    --batch_size 96 \
     --lr 0.0003 \
+    --max_lr 0.001 \
     --min_lr 1e-6 \
     --weight_decay 0.04 \
     --weight_decay_end 0.1 \
@@ -65,5 +68,5 @@ python train_ibot.py \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16
-    # --resume /gpfs/scratch/bm3772/checkpoints_ibot_conservative/checkpoint_XXXX.pth
+    # --resume /gpfs/scratch/bm3772/checkpoints_ibot_feedback/checkpoint_XXXX.pth
 

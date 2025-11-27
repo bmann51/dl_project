@@ -41,8 +41,8 @@ mkdir -p logs
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints/v3/checkpoints_ibot_aggressive \
-    --arch vit_small \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v8/checkpoints_ibot_aggressive_8 \
+    --arch vit_base \
     --optimizer lars \
     --batch_size 128 \
     --lr 0.1 \
@@ -63,6 +63,7 @@ python train_ibot.py \
     --mim_loss_weight 1.5 \
     --cls_loss_weight 1.0 \
     --koleo_weight 0.0 \
+    --mim_temp 0.2 \
     --lars_trust_coefficient 0.001 \
     --lars_eta 0.001 \
     --momentum 0.9 \

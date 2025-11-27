@@ -43,8 +43,8 @@ mkdir -p logs
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints/v3/checkpoints_ibot_feedback \
-    --arch vit_tiny \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v5/checkpoints_ibot_feedback_5 \
+    --arch vit_small \
     --optimizer adamw \
     --batch_size 96 \
     --lr 0.0003 \
@@ -60,11 +60,13 @@ python train_ibot.py \
     --bottleneck_dim 128 \
     --out_dim 4096 \
     --num_tokens 8192 \
-    --mask_ratio 0.3 \
+    --mask_ratio 0.4 \
     --mask_type random \
     --mim_loss_weight 1.0 \
     --cls_loss_weight 1.0 \
     --koleo_weight 0.0 \
+    --warmup_teacher_temp_epochs 10 \
+    --mim_temp 0.15 \
     --num_workers 8 \
     --save_freq 10 \
     --use_fp16

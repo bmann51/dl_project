@@ -31,9 +31,9 @@ iBOT combines:
 
 Three diverse training variants are provided for exploration:
 
-- **`train_ibot_conservative.sh`**: Stable AdamW baseline (lr=0.0003, mask_ratio=0.3, wd=0.04→0.1, ViT-tiny)
-- **`train_ibot_aggressive.sh`**: High-capacity LARS training (lr=0.1, mask_ratio=0.4, blockwise masking, ViT-small)
-- **`train_ibot_feedback.sh`**: Strictly follows training feedback (lr=0.0003, max_lr=0.001, batch_size=96, all recommendations)
+- **`train_ibot_conservative_7.sh`**: Stable AdamW baseline (lr=0.0003, mask_ratio=0.3, wd=0.04→0.1, ViT-tiny)
+- **`train_ibot_aggressive_7.sh`**: High-capacity LARS training (lr=0.1, mask_ratio=0.4, blockwise masking, ViT-small)
+- **`train_ibot_feedback_7.sh`**: Strictly follows training feedback (lr=0.0003, max_lr=0.001, batch_size=96, all recommendations)
 
 See `TRAINING_VARIANTS.md` for detailed comparison.
 
@@ -350,7 +350,7 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
   - Support for both AdamW and LARS optimizers
 
 - `eval_ibot.py`: Evaluation script (k-NN on frozen features)
-- `train_ibot_conservative.sh`, `train_ibot_aggressive.sh`, `train_ibot_feedback.sh`: SLURM training scripts (3 diverse variants)
+- `train_ibot_conservative_7.sh`, `train_ibot_aggressive_7.sh`, `train_ibot_feedback_7.sh`: SLURM training scripts (3 diverse variants)
 - `requirements.txt`: Dependencies
 - `TRAINING_VARIANTS.md`: Detailed comparison of the 3 training variants
 
@@ -360,13 +360,13 @@ L_total = w_MIM * L_MIM + w_CLS * L_CLS + w_KoLeo * L_KoLeo
 
 ```bash
 # Conservative configuration (stable baseline, recommended starting point)
-sbatch train_ibot_conservative.sh
+sbatch train_ibot_conservative_7.sh
 
 # Aggressive configuration (high-capacity exploration with LARS and ViT-small)
-sbatch train_ibot_aggressive.sh
+sbatch train_ibot_aggressive_7.sh
 
 # Feedback configuration (strictly follows all training feedback recommendations)
-sbatch train_ibot_feedback.sh
+sbatch train_ibot_feedback_7.sh
 ```
 
 Or run directly:

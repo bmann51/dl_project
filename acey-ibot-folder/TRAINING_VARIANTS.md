@@ -4,7 +4,7 @@ This folder contains 3 different training configurations to experiment with iBOT
 
 ---
 
-## Version 1: Base Configuration (`train_ibot_v1.sh`)
+## Version 1: Base Configuration (`train_ibot_v1_1.sh`)
 
 **Philosophy**: Balanced approach - equal emphasis on MIM and self-distillation
 
@@ -30,7 +30,7 @@ This folder contains 3 different training configurations to experiment with iBOT
 
 ---
 
-## Version 2: MIM-Focused (`train_ibot_v2.sh`)
+## Version 2: MIM-Focused (`train_ibot_v2_2.sh`)
 
 **Philosophy**: Emphasize masked image modeling - learn stronger local/patch-level features
 
@@ -56,7 +56,7 @@ This folder contains 3 different training configurations to experiment with iBOT
 
 ---
 
-## Version 3: Self-Distillation Focused (`train_ibot_v3.sh`)
+## Version 3: Self-Distillation Focused (`train_ibot_v3_3.sh`)
 
 **Philosophy**: Emphasize DINO-style self-distillation - learn stronger global/semantic features
 
@@ -100,9 +100,9 @@ This folder contains 3 different training configurations to experiment with iBOT
 
 Run any variant:
 ```bash
-sbatch train_ibot_v1.sh  # Base configuration (balanced)
-sbatch train_ibot_v2.sh  # MIM-focused (local features)
-sbatch train_ibot_v3.sh  # Self-distillation focused (global features)
+sbatch train_ibot_v1_1.sh  # Base configuration (balanced)
+sbatch train_ibot_v2_2.sh  # MIM-focused (local features)
+sbatch train_ibot_v3_3.sh  # Self-distillation focused (global features)
 ```
 
 ## Which One to Use?
