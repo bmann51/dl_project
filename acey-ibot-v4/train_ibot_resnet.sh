@@ -42,7 +42,7 @@ mkdir -p logs
 
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_resnet18 \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v4/checkpoints_ibot_resnet18 \
     --arch resnet18 \
     --optimizer adamw \
     --batch_size 128 \

@@ -1,0 +1,242 @@
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+from PIL import Image
+import numpy as np
+from pathlib import Path
+from tqdm import tqdm
+import argparse
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
+from ibot_ssl import get_backbone, MultiCropiBOTWrapper, iBOTHead, iBOTTokenizer
+
+
+class LabeledImageDataset(Dataset):
+    """Dataset for labeled evaluation images"""
+    def __init__(self, root_dir, transform=None):
+        self.root_dir = Path(root_dir)
+        self.transform = transform
+        
+        self.samples = []
+        self.class_to_idx = {}
+        
+        class_dirs = sorted([d for d in self.root_dir.iterdir() if d.is_dir()])
+        
+        for idx, class_dir in enumerate(class_dirs):
+            self.class_to_idx[class_dir.name] = idx
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPEG', '*.JPG', '*.PNG']:
+                for img_path in class_dir.glob(ext):
+                    self.samples.append((img_path, idx))
+        
+        print(f"Found {len(self.samples)} images in {len(self.class_to_idx)} classes")
+    
+    def __len__(self):
+        return len(self.samples)
+    
+    def __getitem__(self, idx):
+        img_path, label = self.samples[idx]
+        image = Image.open(img_path).convert('RGB')
+        
+        if self.transform:
+            image = self.transform(image)
+        
+        return image, label
+
+
+@torch.no_grad()
+def extract_features(model, data_loader, device):
+    """Extract features using the frozen backbone"""
+    model.eval()
+    features_list = []
+    labels_list = []
+    
+    for images, labels in tqdm(data_loader, desc="Extracting features"):
+        images = images.to(device)
+        
+        # Extract features (backbone only, no masking for evaluation)
+        # Model returns normalized CLS token for single images
+        features = model(images, mask=None, return_patch_tokens=False)
+        
+        # Features are already normalized in the forward pass
+        features_list.append(features.cpu())
+        labels_list.append(labels)
+    
+    features = torch.cat(features_list, dim=0).numpy()
+    labels = torch.cat(labels_list, dim=0).numpy()
+    
+    print(f"\nExtracted features - shape: {features.shape}")
+    feature_norms = np.linalg.norm(features, axis=1)
+    print(f"Feature L2 norms - min: {feature_norms.min():.3f}, max: {feature_norms.max():.3f}, mean: {feature_norms.mean():.3f}")
+    
+    return features, labels
+
+
+def knn_evaluation(train_features, train_labels, test_features, test_labels, k=20):
+    """k-NN evaluation on extracted features"""
+    print(f"\nRunning k-NN with k={k}...")
+    
+    knn = KNeighborsClassifier(n_neighbors=k, metric='cosine', n_jobs=-1)
+    knn.fit(train_features, train_labels)
+    
+    predictions = knn.predict(test_features)
+    accuracy = accuracy_score(test_labels, predictions)
+    
+    print(f"k-NN (k={k}) Accuracy: {accuracy * 100:.2f}%")
+    return accuracy
+
+
+def main(args):
+    print("=" * 80)
+    print("iBOT Evaluation")
+    print("=" * 80)
+    
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    # Data transforms (no augmentation for evaluation)
+    transform = transforms.Compose([
+        transforms.Resize(args.image_size),
+        transforms.CenterCrop(args.image_size),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+    
+    # Load datasets
+    print(f"\nLoading train dataset from {args.train_path}")
+    train_dataset = LabeledImageDataset(args.train_path, transform=transform)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True
+    )
+    
+    print(f"\nLoading test dataset from {args.test_path}")
+    test_dataset = LabeledImageDataset(args.test_path, transform=transform)
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=True
+    )
+    
+    num_classes = len(train_dataset.class_to_idx)
+    print(f"\nNumber of classes: {num_classes}")
+    
+    # Load model
+    print(f"\nLoading checkpoint from {args.checkpoint}")
+    checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
+    
+    # Build backbone
+    backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size)
+    
+    # Create heads and tokenizers (needed for model structure, but we only use backbone for eval)
+    global_head = iBOTHead(embed_dim, args.out_dim, bottleneck_dim=args.bottleneck_dim)
+    global_tokenizer = iBOTTokenizer(embed_dim, num_tokens=args.num_tokens)
+    
+    # Create model wrapper
+    model = MultiCropiBOTWrapper(backbone, global_head, global_tokenizer)
+    
+    # Load weights
+    if 'teacher' in checkpoint:
+        state_dict = checkpoint['teacher']
+        print("  Found 'teacher' key in checkpoint")
+    elif 'student' in checkpoint:
+        state_dict = checkpoint['student']
+        print("  Found 'student' key in checkpoint")
+    else:
+        state_dict = checkpoint
+        print("  Loading checkpoint directly")
+    
+    # Extract backbone weights
+    backbone_state_dict = {}
+    for k, v in state_dict.items():
+        if 'backbone' in k:
+            new_key = k.replace('backbone.', '')
+            backbone_state_dict[new_key] = v
+        elif 'head' not in k and 'tokenizer' not in k and 'last_layer' not in k:
+            backbone_state_dict[k] = v
+    
+    missing_keys, unexpected_keys = backbone.load_state_dict(backbone_state_dict, strict=False)
+    if missing_keys:
+        print(f"WARNING: Missing keys: {missing_keys[:5]}...")
+    if unexpected_keys:
+        print(f"WARNING: Unexpected keys: {unexpected_keys[:5]}...")
+    
+    backbone = backbone.to(device)
+    backbone.eval()
+    
+    # Freeze backbone
+    for param in backbone.parameters():
+        param.requires_grad = False
+    
+    print("Backbone loaded and frozen")
+    
+    # Replace backbone in model with loaded backbone
+    model.backbone = backbone
+    model.eval()
+    for param in model.parameters():
+        param.requires_grad = False
+    
+    model = model.to(device)
+    
+    # Extract features
+    print("\nExtracting train features...")
+    train_features, train_labels = extract_features(model, train_loader, device)
+    
+    print("\nExtracting test features...")
+    test_features, test_labels = extract_features(model, test_loader, device)
+    
+    print(f"\nTrain features shape: {train_features.shape}")
+    print(f"Test features shape: {test_features.shape}")
+    
+    # k-NN Evaluation
+    knn_acc = knn_evaluation(train_features, train_labels, 
+                            test_features, test_labels, k=args.k)
+    
+    # Print final results
+    print("\n" + "=" * 80)
+    print("Final Results")
+    print("=" * 80)
+    print(f"k-NN (k={args.k}) Accuracy: {knn_acc * 100:.2f}%")
+    print("=" * 80)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser('iBOT Evaluation')
+    
+    # Data parameters
+    parser.add_argument('--train_path', default='/mnt/user-data/uploads/eval_public/train',
+                       type=str, help='Path to train data')
+    parser.add_argument('--test_path', default='/mnt/user-data/uploads/eval_public/test',
+                       type=str, help='Path to test data')
+    parser.add_argument('--image_size', default=96, type=int, help='Image size')
+    
+    # Model parameters
+    parser.add_argument('--arch', default='vit_base', type=str,
+                       choices=['vit_base'],
+                       help='Architecture')
+    parser.add_argument('--checkpoint', required=True, type=str,
+                       help='Path to checkpoint')
+    parser.add_argument('--out_dim', default=8192, type=int,
+                       help='Output dimension (must match training)')
+    parser.add_argument('--bottleneck_dim', default=256, type=int,
+                       help='Bottleneck dimension (must match training)')
+    parser.add_argument('--num_tokens', default=8192, type=int,
+                       help='Number of tokens (must match training)')
+    
+    # k-NN parameters
+    parser.add_argument('--k', default=20, type=int, help='k for k-NN')
+    
+    # Misc
+    parser.add_argument('--batch_size', default=256, type=int,
+                       help='Batch size for feature extraction')
+    parser.add_argument('--num_workers', default=4, type=int,
+                       help='Number of data loading workers')
+    
+    args = parser.parse_args()
+    main(args)
+

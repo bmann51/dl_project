@@ -29,7 +29,7 @@ mkdir -p logs
 # - Focus on stable, consistent training
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
-    --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_stable \
+    --output_dir /gpfs/scratch/bm3772/checkpoints/v2/checkpoints_ibot_stable \
     --arch vit_small \
     --optimizer adamw \
     --batch_size 128 \

@@ -170,9 +170,9 @@ def train_one_epoch(student, teacher, teacher_without_ddp, ibot_loss,
         batch_size = images[0].shape[0]
         num_patches = (args.image_size // 16) ** 2  # Assuming patch size 16
         
-        # Generate a single mask per image in the batch (shared across crops)
-        mask = mask_generator()
-        student_mask = torch.from_numpy(mask).float().unsqueeze(0).repeat(batch_size, 1).cuda(non_blocking=True)
+        # Generate independent mask per image (better diversity)
+        masks = [mask_generator() for _ in range(batch_size)]
+        student_mask = torch.from_numpy(np.stack(masks)).float().cuda(non_blocking=True)
         
         # Forward pass
         with autocast_context(fp16_scaler is not None):

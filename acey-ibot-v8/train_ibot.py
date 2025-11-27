@@ -166,11 +166,8 @@ def train_one_epoch(student, teacher, teacher_without_ddp, ibot_loss,
         # Move images to GPU
         images = [im.cuda(non_blocking=True) for im in images]
         
-        # Generate mask for student views (same mask for all crops in a batch)
-        batch_size = images[0].shape[0]
-        num_patches = (args.image_size // 16) ** 2  # Assuming patch size 16
-        
         # Generate independent mask per image (better diversity)
+        batch_size = images[0].shape[0]
         masks = [mask_generator() for _ in range(batch_size)]
         student_mask = torch.from_numpy(np.stack(masks)).float().cuda(non_blocking=True)
         
@@ -261,9 +258,17 @@ def train_one_epoch(student, teacher, teacher_without_ddp, ibot_loss,
         
         # Loss component monitoring (every 5 epochs or every 100 iterations)
         if (epoch % 5 == 0 and it == 0) or (it % 100 == 0):
-            print(f"Loss components: mim={loss_components['mim_loss']:.4f}, "
+            mim_val = loss_components['mim_loss']
+            print(f"Loss components: mim={mim_val:.4f}, "
                   f"cls={loss_components['cls_loss']:.4f}, "
                   f"koleo={loss_components['koleo_loss']:.4f}")
+            
+            # Warn if MIM loss has collapsed (near zero after warmup)
+            if mim_val < 0.001 and epoch > 5:
+                if it % 500 == 0:  # Only warn occasionally to avoid spam
+                    print(f"⚠️  WARNING: MIM loss is very low ({mim_val:.6f}). "
+                          f"This may indicate model collapse. "
+                          f"Consider: increasing mask_ratio, increasing mim_temp, or increasing mim_loss_weight.")
         
         # EMA update for teacher
         with torch.no_grad():
@@ -428,11 +433,25 @@ def main(args):
     for p in teacher.parameters():
         p.requires_grad = False
     
-    print(f"Student parameters: {count_parameters(student):,}")
-    print(f"Teacher parameters: {count_parameters(teacher):,}")
+    # Check backbone parameters (assignment requirement: backbone < 100M)
+    backbone_params = count_parameters(student_backbone)
+    total_params = count_parameters(student)
     
-    if count_parameters(student) >= 100_000_000:
-        print(f"WARNING: Model has {count_parameters(student):,} parameters (limit is 100M)")
+    print(f"Backbone parameters: {backbone_params:,}")
+    print(f"Total model parameters (backbone + heads + tokenizers): {total_params:,}")
+    
+    # Assignment requirement: Backbone must be strictly < 100M
+    if backbone_params >= 100_000_000:
+        print(f"\n❌ ERROR: Backbone has {backbone_params:,} parameters (limit is < 100M)")
+        print("This violates assignment requirement #3: 'Backbone parameters must be strictly < 100M'")
+        sys.exit(1)
+    else:
+        print(f"✅ Backbone is under 100M limit ({backbone_params:,} < 100,000,000)")
+    
+    # Also warn if total model is very large (for reference)
+    if total_params >= 100_000_000:
+        print(f"⚠️  WARNING: Total model has {total_params:,} parameters")
+        print("   (Note: Assignment only restricts backbone, not total model)")
     
     patch_size = get_vit_patch_size(student_backbone)
 
@@ -450,10 +469,31 @@ def main(args):
             block_size=args.block_size,
             patch_size=patch_size
         )
+    elif args.mask_type == 'progressive':
+        from ibot_ssl import ProgressiveMaskingGenerator
+        mask_generator = ProgressiveMaskingGenerator(
+            args.image_size,
+            mask_ratio_start=args.mask_ratio_start,
+            mask_ratio_end=args.mask_ratio_end,
+            patch_size=patch_size,
+            total_epochs=args.epochs
+        )
+    elif args.mask_type == 'progressive':
+        from ibot_ssl import ProgressiveMaskingGenerator
+        mask_generator = ProgressiveMaskingGenerator(
+            args.image_size,
+            mask_ratio_start=args.mask_ratio_start,
+            mask_ratio_end=args.mask_ratio_end,
+            patch_size=patch_size,
+            total_epochs=args.epochs
+        )
     else:
         raise ValueError(f"Unknown mask type: {args.mask_type}")
     
-    print(f"Using {args.mask_type} masking with ratio {args.mask_ratio}")
+    if args.mask_type == 'progressive':
+        print(f"Using {args.mask_type} masking: {args.mask_ratio_start} → {args.mask_ratio_end}")
+    else:
+        print(f"Using {args.mask_type} masking with ratio {args.mask_ratio}")
     
     # Loss
     ibot_loss = iBOTLoss(
@@ -469,7 +509,10 @@ def main(args):
         cls_loss_weight=args.cls_loss_weight,
         koleo_weight=args.koleo_weight,
         koleo_eps=args.koleo_eps,
-        mim_temp=args.mim_temp  # Higher temp to prevent collapse
+        mim_temp=args.mim_temp,
+        mim_temp_start=args.mim_temp_start,
+        mim_temp_end=args.mim_temp_end,
+        entropy_weight=args.entropy_weight
     ).to(device)
     
     # Optimizer - LARS for large batch training
@@ -623,8 +666,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('iBOT', add_help=False)
     
     # Model parameters
-    parser.add_argument('--arch', default='vit_small', type=str,
-                       choices=['vit_tiny', 'vit_small', 'vit_base'],
+    parser.add_argument('--arch', default='vit_base', type=str,
+                       choices=['vit_base'],
                        help='Architecture')
     parser.add_argument('--image_size', default=96, type=int, help='Image size')
     parser.add_argument('--out_dim', default=8192, type=int,
@@ -644,9 +687,13 @@ if __name__ == '__main__':
     
     # Masking parameters
     parser.add_argument('--mask_ratio', default=0.3, type=float,
-                       help='Ratio of patches to mask')
+                       help='Mask ratio (for random/blockwise masking). For progressive, use mask_ratio_start/end.')
+    parser.add_argument('--mask_ratio_start', default=0.25, type=float,
+                       help='Initial mask ratio for progressive masking')
+    parser.add_argument('--mask_ratio_end', default=0.40, type=float,
+                       help='Final mask ratio for progressive masking')
     parser.add_argument('--mask_type', default='random', type=str,
-                       choices=['random', 'blockwise'],
+                       choices=['random', 'blockwise', 'progressive'],
                        help='Type of masking strategy')
     parser.add_argument('--block_size', default=2, type=int,
                        help='Block size for blockwise masking')
@@ -670,8 +717,14 @@ if __name__ == '__main__':
                        help='Number of epochs for teacher temperature warmup')
     parser.add_argument('--student_temp', default=0.1, type=float,
                        help='Student temperature')
-    parser.add_argument('--mim_temp', default=0.15, type=float,
-                       help='MIM tokenizer temperature (higher = softer targets, prevents collapse)')
+    parser.add_argument('--mim_temp', default=0.2, type=float,
+                       help='MIM tokenizer temperature (higher = softer targets, prevents collapse). Used if mim_temp_start/end not set.')
+    parser.add_argument('--mim_temp_start', default=None, type=float,
+                       help='MIM temperature at start (softer, prevents collapse). If None, uses mim_temp.')
+    parser.add_argument('--mim_temp_end', default=None, type=float,
+                       help='MIM temperature at end (sharper, maintains signal). If None, uses mim_temp.')
+    parser.add_argument('--entropy_weight', default=0.1, type=float,
+                       help='Weight for entropy regularization in MIM loss (encourages diverse predictions, prevents collapse)')
     
     # Training parameters
     parser.add_argument('--momentum_teacher', default=0.996, type=float,
