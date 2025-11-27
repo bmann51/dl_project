@@ -344,6 +344,7 @@ class iBOTLoss(nn.Module):
             
             # Process each crop separately
             mim_losses = []
+            total_masked_patches = 0
             for crop_idx in range(self.ncrops):
                 start_idx = crop_idx * batch_size
                 end_idx = (crop_idx + 1) * batch_size
@@ -358,8 +359,10 @@ class iBOTLoss(nn.Module):
                 # student_mask: [batch, num_patches] where 0=masked, 1=visible
                 mask_expanded = student_mask.unsqueeze(-1)  # [batch, num_patches, 1]
                 masked_patches = (student_mask == 0)  # [batch, num_patches]
+                num_masked = masked_patches.sum().item()
+                total_masked_patches += num_masked
                 
-                if masked_patches.sum() > 0:
+                if num_masked > 0:
                     # Get teacher soft targets for masked patches
                     teacher_tokens_masked = teacher_tokens_crop[masked_patches]  # [num_masked, num_tokens]
                     # Use higher temperature to prevent collapse (0.15 instead of 0.07)
@@ -378,6 +381,17 @@ class iBOTLoss(nn.Module):
             if len(mim_losses) > 0:
                 mim_loss = sum(mim_losses) / len(mim_losses)
                 total_loss += self.mim_loss_weight * mim_loss
+                
+                # Store diagnostic info for potential debugging
+                # If mim_loss is 0, it could mean:
+                # 1. Model collapse (student = teacher exactly)
+                # 2. No masked patches (shouldn't happen with mask_ratio > 0)
+                # 3. Numerical precision (loss is tiny but not exactly 0)
+            else:
+                # No masked patches found - this shouldn't happen with proper mask_ratio
+                # But if it does, mim_loss stays at 0.0
+                # This could happen if mask_ratio is 0 or mask generation fails
+                pass
         
         # 2. Self-distillation loss (DINO-style) on CLS tokens
         if self.cls_loss_weight > 0:

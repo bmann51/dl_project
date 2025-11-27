@@ -31,7 +31,7 @@ mkdir -p logs
 python train_ibot.py \
     --data_path /gpfs/scratch/bm3772/fall2025_data/train \
     --output_dir /gpfs/scratch/bm3772/checkpoints_ibot_balanced \
-    --arch vit_tiny \
+    --arch vit_small \
     --optimizer adamw \
     --batch_size 128 \
     --lr 0.0005 \

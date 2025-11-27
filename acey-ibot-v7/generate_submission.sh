@@ -41,7 +41,7 @@ python generate_submission_ibot.py \
     --checkpoint /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v1/checkpoint_0069.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data \
     --output submission_ibot_v1.csv \
-    --arch vit_small \
+    --arch vit_base \
     --resolution 96 \
     --out_dim 4096 \
     --bottleneck_dim 128 \
@@ -52,7 +52,7 @@ python generate_submission_ibot.py \
     --checkpoint /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v1/checkpoint_0069.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_2/data \
     --output submission_ibot_v1.csv \
-    --arch vit_small \
+    --arch vit_base \
     --resolution 96 \
     --out_dim 4096 \
     --bottleneck_dim 128 \
@@ -64,7 +64,7 @@ python generate_submission_ibot.py \
     --checkpoint /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v2/checkpoint_0069.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data \
     --output submission_ibot_v2.csv \
-    --arch vit_small \
+    --arch vit_base \
     --resolution 96 \
     --out_dim 4096 \
     --bottleneck_dim 128 \
@@ -75,7 +75,7 @@ python generate_submission_ibot.py \
     --checkpoint /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v2/checkpoint_0069.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_2/data \
     --output submission_ibot_v2.csv \
-    --arch vit_small \
+    --arch vit_base \
     --resolution 96 \
     --out_dim 4096 \
     --bottleneck_dim 128 \
@@ -88,7 +88,7 @@ python generate_submission_ibot.py \
     --checkpoint /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v3/checkpoint_0059.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_1/data \
     --output submission_ibot_v3.csv \
-    --arch vit_small \
+    --arch vit_base \
     --resolution 96 \
     --out_dim 4096 \
     --bottleneck_dim 128 \
@@ -99,7 +99,7 @@ python generate_submission_ibot.py \
     --checkpoint /gpfs/scratch/bm3772/checkpoints_ibot_vit_tiny_v3/checkpoint_0059.pth \
     --data_dir /gpfs/scratch/bm3772/fall2025_finalproject/testset_2/data \
     --output submission_ibot_v3.csv \
-    --arch vit_small \
+    --arch vit_base \
     --resolution 96 \
     --out_dim 4096 \
     --bottleneck_dim 128 \

@@ -637,8 +637,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('iBOT', add_help=False)
     
     # Model parameters
-    parser.add_argument('--arch', default='vit_small', type=str,
-                       choices=['vit_small', 'vit_base'],
+    parser.add_argument('--arch', default='vit_base', type=str,
+                       choices=['vit_base'],
                        help='Architecture')
     parser.add_argument('--image_size', default=96, type=int, help='Image size')
     parser.add_argument('--out_dim', default=8192, type=int,
