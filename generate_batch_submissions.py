@@ -103,11 +103,20 @@ def find_checkpoint_directories(pattern: str, base_path: Path = None) -> List[Pa
             # Also try variant-specific patterns if pattern is generic
             if "*" in pattern:
                 # For patterns like "checkpoints_ibot_*_v8", try direct variant names
-                variant_patterns = [
-                    f"checkpoints_ibot_conservative_{version_num}",
-                    f"checkpoints_ibot_feedback_{version_num}",
-                    f"checkpoints_ibot_aggressive_{version_num}",
-                ]
+                # v2 uses different variant names: stable, balanced, peak_lr
+                if version_num == "2":
+                    variant_patterns = [
+                        f"checkpoints_ibot_stable_{version_num}",
+                        f"checkpoints_ibot_balanced_{version_num}",
+                        f"checkpoints_ibot_peak_lr_{version_num}",
+                    ]
+                else:
+                    # v3, v5, v7, v8 use: conservative, feedback, aggressive
+                    variant_patterns = [
+                        f"checkpoints_ibot_conservative_{version_num}",
+                        f"checkpoints_ibot_feedback_{version_num}",
+                        f"checkpoints_ibot_aggressive_{version_num}",
+                    ]
                 for vp in variant_patterns:
                     found_dirs.extend(version_dir.glob(vp))
     
@@ -417,33 +426,53 @@ def main():
                     if version and version.startswith("v"):
                         version_num = version[1:]  # "8" from "v8"
                         # Try patterns like: checkpoints_ibot_conservative_8
-                        variant_patterns = [
-                            f"checkpoints_ibot_conservative_{version_num}",
-                            f"checkpoints_ibot_feedback_{version_num}",
-                            f"checkpoints_ibot_aggressive_{version_num}",
-                        ]
+                        # v2 uses different variant names: stable, balanced, peak_lr
+                        if version_num == "2":
+                            variant_patterns = [
+                                f"checkpoints_ibot_stable_{version_num}",
+                                f"checkpoints_ibot_balanced_{version_num}",
+                                f"checkpoints_ibot_peak_lr_{version_num}",
+                            ]
+                            variant_patterns_v = [
+                                f"checkpoints_ibot_stable_v{version_num}",
+                                f"checkpoints_ibot_balanced_v{version_num}",
+                                f"checkpoints_ibot_peak_lr_v{version_num}",
+                            ]
+                        else:
+                            # v3, v5, v7, v8 use: conservative, feedback, aggressive
+                            variant_patterns = [
+                                f"checkpoints_ibot_conservative_{version_num}",
+                                f"checkpoints_ibot_feedback_{version_num}",
+                                f"checkpoints_ibot_aggressive_{version_num}",
+                            ]
+                            variant_patterns_v = [
+                                f"checkpoints_ibot_conservative_v{version_num}",
+                                f"checkpoints_ibot_feedback_v{version_num}",
+                                f"checkpoints_ibot_aggressive_v{version_num}",
+                            ]
                         for vp in variant_patterns:
                             matching_dirs.extend(find_checkpoint_directories(vp))
                         
                         # Also try with "v" prefix in pattern
-                        variant_patterns_v = [
-                            f"checkpoints_ibot_conservative_v{version_num}",
-                            f"checkpoints_ibot_feedback_v{version_num}",
-                            f"checkpoints_ibot_aggressive_v{version_num}",
-                        ]
                         for vp in variant_patterns_v:
                             matching_dirs.extend(find_checkpoint_directories(vp))
                 
                 for ckpt_dir in sorted(set(matching_dirs)):
                     dir_name = ckpt_dir.name
                     
-                    # Extract variant name (conservative, feedback, aggressive, etc.)
+                    # Extract variant name (conservative, feedback, aggressive, stable, balanced, peak_lr, etc.)
                     if "conservative" in dir_name:
                         variant_name = "conservative"
                     elif "feedback" in dir_name:
                         variant_name = "feedback"
                     elif "aggressive" in dir_name:
                         variant_name = "aggressive"
+                    elif "stable" in dir_name:
+                        variant_name = "stable"
+                    elif "balanced" in dir_name:
+                        variant_name = "balanced"
+                    elif "peak_lr" in dir_name:
+                        variant_name = "peak_lr"
                     else:
                         # Try to extract from pattern
                         parts = dir_name.replace("checkpoints_ibot_", "").split("_")
