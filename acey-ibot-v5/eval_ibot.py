@@ -10,7 +10,7 @@ from tqdm import tqdm
 import argparse
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
-from ibot_ssl import get_backbone, MultiCropiBOTWrapper, iBOTTokenizer
+from ibot_ssl import get_backbone, iBOTTokenizer
 
 
 # Define BatchNorm version of iBOTHead to match training checkpoints
@@ -44,6 +44,40 @@ class iBOTHead(nn.Module):
         x = F.normalize(x, dim=-1, p=2)
         x = self.last_layer(x)
         return x
+
+
+# Define simpler wrapper for evaluation (matches generate_submission_ibot.py)
+class MultiCropiBOTWrapper(nn.Module):
+    """Wrapper for iBOT - for evaluation, returns normalized backbone CLS token"""
+    def __init__(self, backbone, head, tokenizer, local_head=None, local_tokenizer=None):
+        super().__init__()
+        self.backbone = backbone
+        self.head = head
+        self.tokenizer = tokenizer
+        self.local_head = local_head
+        self.local_tokenizer = local_tokenizer
+    
+    def forward(self, x, mask=None, return_patch_tokens=False):
+        """For evaluation: return normalized CLS token from backbone"""
+        features = self.backbone(x)  # Get backbone output
+        
+        # Handle different output formats from timm
+        if isinstance(features, torch.Tensor):
+            # If features is a tensor, check its shape
+            if len(features.shape) == 3:
+                # [batch, num_patches+1, embed_dim] - extract CLS token
+                cls_token = features[:, 0]
+            elif len(features.shape) == 2:
+                # [batch, embed_dim] - already pooled, use directly
+                cls_token = features
+            else:
+                raise ValueError(f"Unexpected feature shape: {features.shape}")
+        else:
+            raise ValueError(f"Unexpected feature type: {type(features)}")
+        
+        # Normalize
+        cls_token = F.normalize(cls_token, dim=-1, p=2)
+        return cls_token
 
 
 class LabeledImageDataset(Dataset):
