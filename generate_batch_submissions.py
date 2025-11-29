@@ -14,6 +14,7 @@ Usage:
 
 import os
 import json
+import re
 from pathlib import Path
 from typing import List, Dict
 
@@ -71,23 +72,37 @@ def find_checkpoint_directories(pattern: str, base_path: Path = None) -> List[Pa
     Looks in:
     - BASE_CHECKPOINT_PATH/v*/pattern (v2, v5, v6, v7, v8, etc.)
     - BASE_CHECKPOINT_PATH/pattern (fallback for non-versioned)
+    
+    If pattern contains a version number (e.g., _v3), only matches directories
+    with that version number to avoid finding duplicates across versions.
     """
     if base_path is None:
         base_path = Path(BASE_CHECKPOINT_PATH)
     
     found_dirs = []
     
+    # Extract version number from pattern if present (e.g., "_v3" from "checkpoints_ibot_*_v3")
+    pattern_version = None
+    version_match = re.search(r'_v(\d+)(?:\b|$)', pattern)
+    if version_match:
+        pattern_version = version_match.group(1)
+    
     # Primary: Check version subdirectories (v2, v5, v6, v7, v8, etc.)
     # Structure: checkpoints/v8/checkpoints_ibot_conservative_8/
     for version_dir in sorted(base_path.glob("v*")):
         if version_dir.is_dir():
+            version_num = version_dir.name[1:] if version_dir.name.startswith("v") else version_dir.name
+            
+            # If pattern specifies a version, only search in matching version directory
+            if pattern_version and version_num != pattern_version:
+                continue
+            
             # Look for pattern inside version directory
             found_dirs.extend(version_dir.glob(pattern))
             
             # Also try variant-specific patterns if pattern is generic
             if "*" in pattern:
                 # For patterns like "checkpoints_ibot_*_v8", try direct variant names
-                version_num = version_dir.name[1:] if version_dir.name.startswith("v") else version_dir.name
                 variant_patterns = [
                     f"checkpoints_ibot_conservative_{version_num}",
                     f"checkpoints_ibot_feedback_{version_num}",
@@ -98,6 +113,17 @@ def find_checkpoint_directories(pattern: str, base_path: Path = None) -> List[Pa
     
     # Fallback: Direct match in base (for non-versioned checkpoints)
     found_dirs.extend(base_path.glob(pattern))
+    
+    # Filter: If pattern specifies a version, only return directories matching that version
+    if pattern_version:
+        filtered_dirs = []
+        for d in found_dirs:
+            if d.is_dir():
+                # Check if directory name contains the version number
+                dir_name = d.name
+                if f"_{pattern_version}" in dir_name or dir_name.endswith(f"_v{pattern_version}"):
+                    filtered_dirs.append(d)
+        found_dirs = filtered_dirs
     
     # Return unique directories (only within BASE_CHECKPOINT_PATH)
     return list(set([d for d in found_dirs if d.is_dir()]))
@@ -241,10 +267,14 @@ def get_args_from_checkpoint(checkpoint_path: str, default_args: Dict) -> Dict:
                     args["out_dim"] = ckpt_args["out_dim"]
                 if "bottleneck_dim" in ckpt_args:
                     args["bottleneck_dim"] = ckpt_args["bottleneck_dim"]
+                elif "bottleneck" in ckpt_args:  # Try alternative key name
+                    args["bottleneck_dim"] = ckpt_args["bottleneck"]
                 if "num_tokens" in ckpt_args and "num_tokens" in args:
                     args["num_tokens"] = ckpt_args["num_tokens"]
         except Exception as e:
             print(f"    Warning: Could not read args.json from {checkpoint_dir}: {e}")
+    else:
+        print(f"    Warning: args.json not found in {checkpoint_dir}, using default args")
     
     return args
 
