@@ -267,14 +267,18 @@ def get_args_from_checkpoint(checkpoint_path: str, default_args: Dict) -> Dict:
                     args["out_dim"] = ckpt_args["out_dim"]
                 if "bottleneck_dim" in ckpt_args:
                     args["bottleneck_dim"] = ckpt_args["bottleneck_dim"]
+                    print(f"    Using bottleneck_dim={ckpt_args['bottleneck_dim']} from args.json")
                 elif "bottleneck" in ckpt_args:  # Try alternative key name
                     args["bottleneck_dim"] = ckpt_args["bottleneck"]
+                    print(f"    Using bottleneck_dim={ckpt_args['bottleneck']} from args.json (key: 'bottleneck')")
+                else:
+                    print(f"    Warning: bottleneck_dim not found in args.json, using default: {args['bottleneck_dim']}")
                 if "num_tokens" in ckpt_args and "num_tokens" in args:
                     args["num_tokens"] = ckpt_args["num_tokens"]
         except Exception as e:
             print(f"    Warning: Could not read args.json from {checkpoint_dir}: {e}")
     else:
-        print(f"    Warning: args.json not found in {checkpoint_dir}, using default args")
+        print(f"    Warning: args.json not found in {checkpoint_dir}, using default args (bottleneck_dim={args['bottleneck_dim']})")
     
     return args
 
