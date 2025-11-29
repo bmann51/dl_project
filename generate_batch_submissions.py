@@ -468,7 +468,7 @@ def main():
         "# Create logs directory",
         "mkdir -p logs",
         "",
-        f        "# Create output directory",
+        "# Create output directory",
         f"mkdir -p {OUTPUT_DIR}",
         f"echo 'Output directory: {OUTPUT_DIR}'",
         "",
