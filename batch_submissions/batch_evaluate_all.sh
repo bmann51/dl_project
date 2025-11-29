@@ -41,6 +41,13 @@ echo "Base directory: $BASE_DIR"
 echo "Working directory: $(pwd)"
 echo ""
 
+# Verify the script exists
+if [ ! -f "$BASE_DIR/batch_evaluate_all.py" ]; then
+    echo "ERROR: batch_evaluate_all.py not found in $BASE_DIR"
+    echo "Please make sure you're running sbatch from the project root directory"
+    exit 1
+fi
+
 # Run batch evaluation script
 python "$BASE_DIR/batch_evaluate_all.py"
 

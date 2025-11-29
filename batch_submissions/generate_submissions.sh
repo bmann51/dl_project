@@ -16,22 +16,39 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate dino_new
 
-# Create logs directory
+# Base directory - use SLURM_SUBMIT_DIR if available (where sbatch was run from)
+# Otherwise fall back to script location
+if [ -n "$SLURM_SUBMIT_DIR" ]; then
+    BASE_DIR="$SLURM_SUBMIT_DIR"
+else
+    # Get directory where this script is located, then go up one level
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BASE_DIR="$(dirname "$SCRIPT_DIR")"
+fi
+
+# Change to base directory first
+cd "$BASE_DIR" || exit 1
+
+# Create logs directory in base directory
 mkdir -p logs
 
-# Base directory (parent of batch_submissions)
-SCRIPT_DIR=$(dirname $(realpath $0))
-BASE_DIR=$(dirname "$SCRIPT_DIR")
-cd "$BASE_DIR"
-
-# Create output directories
+# Create output directories in base directory
 mkdir -p batch_submissions
 
 echo "Running generate_batch_submissions.py..."
+echo "Base directory: $BASE_DIR"
+echo "Working directory: $(pwd)"
 echo ""
 
+# Verify the script exists
+if [ ! -f "$BASE_DIR/generate_batch_submissions.py" ]; then
+    echo "ERROR: generate_batch_submissions.py not found in $BASE_DIR"
+    echo "Please make sure you're running sbatch from the project root directory"
+    exit 1
+fi
+
 # Run the generator
-python generate_batch_submissions.py
+python "$BASE_DIR/generate_batch_submissions.py"
 
 echo ""
 echo "Generation Complete"
