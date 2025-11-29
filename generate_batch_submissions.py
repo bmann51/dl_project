@@ -160,12 +160,13 @@ def get_model_configs() -> Dict:
             "args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
-        # Acey iBOT v2
+        # Acey iBOT v2 (with variants: stable, balanced, peak_lr)
         "acey-ibot-v2": {
             "folder": "acey-ibot-v2",
             "script": "generate_submission_ibot.py",
-            "checkpoint_dirs": ["checkpoints_ibot_vit_tiny_v2"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "checkpoint_pattern": "checkpoints_ibot_*_v2",  # Will discover variants like stable_2, balanced_2, peak_lr_2
+            "use_variants": True,
+            "default_args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v3 (with variants: conservative, feedback, aggressive)
