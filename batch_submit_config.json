@@ -1,0 +1,203 @@
+{
+  "base_data_path": "/gpfs/scratch/bm3772/fall2025_finalproject",
+  "base_checkpoint_path": "/gpfs/scratch/bm3772",
+  "testsets": ["testset_1", "testset_2", "testset_3"],
+  
+  "models": {
+    "acey-dino": {
+      "folder": "acey-submission-folder",
+      "script": "generate_submission.py",
+      "type": "dino",
+      "checkpoint_dirs": [
+        "checkpoints_vit_tiny",
+        "checkpoints_vit_small",
+        "checkpoints_vit_base"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 8192,
+        "bottleneck_dim": 256
+      },
+      "variations": [
+        {"arch": "vit_tiny", "out_dim": 8192, "bottleneck_dim": 256},
+        {"arch": "vit_small", "out_dim": 4096, "bottleneck_dim": 128},
+        {"arch": "vit_base", "out_dim": 4096, "bottleneck_dim": 128}
+      ]
+    },
+    
+    "acey-ibot-v1": {
+      "folder": "acey-ibot-folder",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v1"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      }
+    },
+    
+    "acey-ibot-v2": {
+      "folder": "acey-ibot-v2",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v2"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      }
+    },
+    
+    "acey-ibot-v3": {
+      "folder": "acey-ibot-v3",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v3",
+        "checkpoints_ibot_vit_small_v3"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      },
+      "variations": [
+        {"arch": "vit_tiny", "out_dim": 4096, "bottleneck_dim": 128},
+        {"arch": "vit_small", "out_dim": 4096, "bottleneck_dim": 128}
+      ]
+    },
+    
+    "acey-ibot-v4": {
+      "folder": "acey-ibot-v4",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v4",
+        "checkpoints_ibot_resnet_v4",
+        "checkpoints_ibot_convnext_v4"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      }
+    },
+    
+    "acey-ibot-v5": {
+      "folder": "acey-ibot-v5",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v5"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      }
+    },
+    
+    "acey-ibot-v7": {
+      "folder": "acey-ibot-v7",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v7"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      }
+    },
+    
+    "acey-ibot-v8": {
+      "folder": "acey-ibot-v8",
+      "script": "generate_submission_ibot.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_ibot_vit_tiny_v8",
+        "checkpoints_ibot_vit_small_v8"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      },
+      "variations": [
+        {"arch": "vit_tiny", "out_dim": 4096, "bottleneck_dim": 128},
+        {"arch": "vit_small", "out_dim": 4096, "bottleneck_dim": 128}
+      ]
+    },
+    
+    "brian-dino": {
+      "folder": "brian-folder",
+      "script": "generate_submission2.py",
+      "type": "dino",
+      "checkpoint_dirs": [
+        "checkpoints_base",
+        "checkpoints_small"
+      ],
+      "default_args": {
+        "arch": "vit_base",
+        "resolution": 96,
+        "k": 5,
+        "out_dim": 4096,
+        "bottleneck_dim": 128
+      },
+      "variations": [
+        {"arch": "vit_base", "out_dim": 4096, "bottleneck_dim": 128},
+        {"arch": "vit_small", "out_dim": 4096, "bottleneck_dim": 128}
+      ]
+    },
+    
+    "macey-ibot-v6": {
+      "folder": "macey-ibot-v6",
+      "script": "generate_submission.py",
+      "type": "ibot",
+      "checkpoint_dirs": [
+        "checkpoints_v6"
+      ],
+      "default_args": {
+        "arch": "vit_tiny",
+        "resolution": 96,
+        "k": 20,
+        "out_dim": 4096,
+        "bottleneck_dim": 128,
+        "num_tokens": 8192
+      }
+    }
+  },
+  
+  "k_values": [5, 10, 20],
+  "max_checkpoints_per_dir": 3
+}
+
