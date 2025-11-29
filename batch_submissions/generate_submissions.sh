@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64GB
 #SBATCH --time=1:00:00
-#SBATCH --partition=cpu
+#SBATCH --partition=a100_short
 #SBATCH --output=logs/gen_submissions_%j.out
 #SBATCH --error=logs/gen_submissions_%j.err
 

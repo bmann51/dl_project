@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64GB
 #SBATCH --time=0:30:00
-#SBATCH --partition=cpu
+#SBATCH --partition=a100_short
 #SBATCH --output=logs/extract_acc_%j.out
 #SBATCH --error=logs/extract_acc_%j.err
 
