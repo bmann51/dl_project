@@ -146,19 +146,19 @@ def get_model_configs() -> Dict:
             "folder": "acey-submission-folder",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_vit_tiny"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 8192, "bottleneck_dim": 256},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 8192, "bottleneck_dim": 256},
         },
         "acey-dino-small": {
             "folder": "acey-submission-folder",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_vit_small"],
-            "args": {"arch": "vit_small", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128},
+            "args": {"arch": "vit_small", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128},
         },
         "acey-dino-base": {
             "folder": "acey-submission-folder",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_vit_base"],
-            "args": {"arch": "vit_base", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128},
+            "args": {"arch": "vit_base", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128},
         },
         
         # Acey iBOT v1
@@ -166,7 +166,7 @@ def get_model_configs() -> Dict:
             "folder": "acey-ibot-folder",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_vit_tiny_v1"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v2 (with variants: stable, balanced, peak_lr)
@@ -175,7 +175,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v2",  # Will discover variants like stable_2, balanced_2, peak_lr_2
             "use_variants": True,
-            "default_args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v3 (with variants: conservative, feedback, aggressive)
@@ -184,7 +184,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v3",  # Will discover variants
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v4
@@ -192,19 +192,19 @@ def get_model_configs() -> Dict:
             "folder": "acey-ibot-v4",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_vit_tiny_v4"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         "acey-ibot-v4-resnet": {
             "folder": "acey-ibot-v4",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_resnet_v4"],
-            "args": {"arch": "resnet50", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "resnet50", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         "acey-ibot-v4-convnext": {
             "folder": "acey-ibot-v4",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_convnext_v4"],
-            "args": {"arch": "convnext_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "convnext_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v5 (with variants)
@@ -213,7 +213,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v5",
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v7 (with variants)
@@ -222,7 +222,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v7",
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v8 (with variants)
@@ -231,7 +231,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v8",
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Brian DINO
@@ -253,7 +253,7 @@ def get_model_configs() -> Dict:
             "folder": "macey-ibot-v6",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_v6"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 20, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
     }
 
