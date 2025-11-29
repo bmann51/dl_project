@@ -91,7 +91,12 @@ def run_evaluation(model_name: str, config: Dict, checkpoint: str, testset: str)
         )
         
         if result.returncode != 0:
-            print(f"  ✗ Evaluation failed: {result.stderr[:200]}")
+            # Print full error for debugging
+            error_msg = result.stderr if result.stderr else result.stdout
+            print(f"  ✗ Evaluation failed:")
+            # Print last 500 chars to see the actual error
+            if error_msg:
+                print(f"    {error_msg[-500:]}")
             return None
         
         # Parse accuracy from output

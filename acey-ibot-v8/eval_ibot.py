@@ -10,7 +10,8 @@ from tqdm import tqdm
 import argparse
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
-from ibot_ssl import get_backbone, iBOTTokenizer
+import timm
+from ibot_ssl import iBOTTokenizer
 
 
 # Define BatchNorm version of iBOTHead to match training checkpoints
@@ -57,7 +58,7 @@ class MultiCropiBOTWrapper(nn.Module):
         self.local_head = local_head
         self.local_tokenizer = local_tokenizer
     
-    def forward(self, x, mask=None, return_patch_tokens=False):
+    def forward(self, x):
         """For evaluation: return normalized CLS token from backbone"""
         features = self.backbone(x)  # Get backbone output
         
@@ -78,6 +79,33 @@ class MultiCropiBOTWrapper(nn.Module):
         # Normalize
         cls_token = F.normalize(cls_token, dim=-1, p=2)
         return cls_token
+
+
+# ============================================================================
+#                          ARCHITECTURE CONFIG
+# ============================================================================
+
+def get_model_config(arch):
+    """Get model configuration based on architecture"""
+    configs = {
+        'vit_tiny': {
+            'model_name': 'vit_tiny_patch16_224',
+            'embed_dim': 192,
+        },
+        'vit_small': {
+            'model_name': 'vit_small_patch16_224',
+            'embed_dim': 384,
+        },
+        'vit_base': {
+            'model_name': 'vit_base_patch16_224',
+            'embed_dim': 768,
+        },
+    }
+    
+    if arch not in configs:
+        raise ValueError(f"Unknown architecture: {arch}")
+    
+    return configs[arch]
 
 
 class LabeledImageDataset(Dataset):
@@ -124,7 +152,7 @@ def extract_features(model, data_loader, device):
         
         # Extract features (backbone only, no masking for evaluation)
         # Model returns normalized CLS token for single images
-        features = model(images, mask=None, return_patch_tokens=False)
+        features = model(images)
         
         # Features are already normalized in the forward pass
         features_list.append(features.cpu())
@@ -198,8 +226,19 @@ def main(args):
     print(f"\nLoading checkpoint from {args.checkpoint}")
     checkpoint = torch.load(args.checkpoint, map_location='cpu', weights_only=False)
     
-    # Build backbone
-    backbone, embed_dim = get_backbone(args.arch, img_size=args.image_size)
+    # Get model configuration
+    config = get_model_config(args.arch)
+    model_name = config['model_name']
+    embed_dim = config['embed_dim']
+    
+    # Build backbone - IMPORTANT: use global_pool='' to get all tokens like in training
+    backbone = timm.create_model(
+        model_name, 
+        pretrained=False, 
+        num_classes=0,
+        img_size=args.image_size,
+        global_pool=''  # Returns [batch, num_patches+1, embed_dim] instead of [batch, embed_dim]
+    )
     
     # Create heads and tokenizers (needed for model structure, but we only use backbone for eval)
     global_head = iBOTHead(embed_dim, args.out_dim, bottleneck_dim=args.bottleneck_dim)
