@@ -263,7 +263,7 @@ def get_model_configs(k: int = 5) -> Dict:
             "folder": "macey-ibot-v6",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_ibot_v6_liberal_6", "checkpoints_v6", "dino/checkpoints_v6", "dino/macey-ibot-v6/checkpoints_v6", "dino/macey-ibot-v6"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "vit_small", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 256, "num_tokens": 8192},
         },
     }
 
