@@ -99,15 +99,7 @@ def find_checkpoint_directories(pattern: str, base_path: Path = None) -> List[Pa
     # Fallback: Direct match in base (for non-versioned checkpoints)
     found_dirs.extend(base_path.glob(pattern))
     
-    # Also check parent directory (for checkpoints at /gpfs/scratch/bm3772/checkpoints_*)
-    parent_base = base_path.parent
-    if parent_base.exists():
-        found_dirs.extend(parent_base.glob(pattern))
-        for version_dir in parent_base.glob("v*"):
-            if version_dir.is_dir():
-                found_dirs.extend(version_dir.glob(pattern))
-    
-    # Return unique directories
+    # Return unique directories (only within BASE_CHECKPOINT_PATH)
     return list(set([d for d in found_dirs if d.is_dir()]))
 
 
@@ -281,8 +273,13 @@ def generate_submission_command(
     if output_path is None:
         output_path = str((OUTPUT_DIR / output_name).resolve())
     
+    # Ensure output directory exists
+    output_dir = Path(output_path).parent
+    
     cmd_parts = [
         f"cd {PROJECT_ROOT / folder}",
+        "&&",
+        f"mkdir -p {output_dir}",
         "&&",
         "python", script,
         "--checkpoint", checkpoint,
@@ -413,11 +410,6 @@ def main():
                             version_path = version_dir / checkpoint_dir
                             if version_path.exists():
                                 matching_dirs.append(version_path)
-                    
-                    # Also try in parent (for checkpoints at /gpfs/scratch/bm3772/checkpoints_*)
-                    parent_path = Path(BASE_CHECKPOINT_PATH).parent / checkpoint_dir
-                    if parent_path.exists():
-                        matching_dirs.append(parent_path)
                 
                 for ckpt_dir in matching_dirs:
                     checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=1)  # Only final or highest checkpoint
@@ -476,8 +468,9 @@ def main():
         "# Create logs directory",
         "mkdir -p logs",
         "",
-        f"# Create output directory",
+        f        "# Create output directory",
         f"mkdir -p {OUTPUT_DIR}",
+        f"echo 'Output directory: {OUTPUT_DIR}'",
         "",
         "# Counter for tracking",
         "SUCCESS=0",
@@ -507,12 +500,13 @@ def main():
             f"echo '--- Job {i}/{len(all_jobs)}: {model_name} on {testset} ---'",
             f"echo 'Checkpoint: {Path(checkpoint).name}'",
             f"echo 'Output: {output_name}'",
-            cmd,
-            "if [ $? -eq 0 ]; then",
+            f"# Run command and capture both stdout and stderr",
+            f"if {cmd} 2>&1; then",
             f"    echo '✓ SUCCESS: {output_name}'",
             "    SUCCESS=$((SUCCESS + 1))",
             "else",
             f"    echo '✗ FAILED: {output_name}'",
+            f"    echo 'Error details above. Exit code: $?'",
             "    FAILED=$((FAILED + 1))",
             "fi",
             "echo ''",
