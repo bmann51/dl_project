@@ -2,12 +2,12 @@
 #SBATCH --job-name=extract_acc
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8GB
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64GB
 #SBATCH --time=0:30:00
 #SBATCH --partition=cpu
-#SBATCH --output=extract_accuracies_%j.out
-#SBATCH --error=extract_accuracies_%j.err
+#SBATCH --output=logs/extract_acc_%j.out
+#SBATCH --error=logs/extract_acc_%j.err
 
 # Print info
 echo "========================================"
@@ -21,6 +21,9 @@ echo ""
 SCRIPT_DIR=$(dirname $(realpath $0))
 BASE_DIR=$(dirname "$SCRIPT_DIR")
 cd "$BASE_DIR"
+
+# Create logs directory
+mkdir -p logs
 
 echo "Running extract_accuracies.py..."
 echo ""

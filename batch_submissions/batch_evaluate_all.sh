@@ -7,8 +7,8 @@
 #SBATCH --time=24:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100_short
-#SBATCH --output=batch_evaluate_%j.out
-#SBATCH --error=batch_evaluate_%j.err
+#SBATCH --output=logs/batch_eval_%j.out
+#SBATCH --error=logs/batch_eval_%j.err
 
 # Load modules
 module load cuda/11.8
@@ -30,8 +30,9 @@ echo ""
 # Base directory
 BASE_DIR=$(dirname $(dirname $(realpath $0)))
 
-# Create output directory
+# Create output directories
 mkdir -p batch_submissions
+mkdir -p logs
 
 echo "Starting batch evaluation..."
 echo ""

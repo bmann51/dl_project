@@ -2,12 +2,12 @@
 #SBATCH --job-name=gen_submissions
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16GB
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64GB
 #SBATCH --time=1:00:00
 #SBATCH --partition=cpu
-#SBATCH --output=generate_submissions_%j.out
-#SBATCH --error=generate_submissions_%j.err
+#SBATCH --output=logs/gen_submissions_%j.out
+#SBATCH --error=logs/gen_submissions_%j.err
 
 # Load modules
 module load cuda/11.8
@@ -29,8 +29,9 @@ SCRIPT_DIR=$(dirname $(realpath $0))
 BASE_DIR=$(dirname "$SCRIPT_DIR")
 cd "$BASE_DIR"
 
-# Create output directory
+# Create output directories
 mkdir -p batch_submissions
+mkdir -p logs
 
 echo "Running generate_batch_submissions.py..."
 echo ""
