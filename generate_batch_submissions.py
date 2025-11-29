@@ -9,12 +9,12 @@ This script:
 
 Usage:
     python generate_batch_submissions.py [--k K_VALUE]
-    sbatch batch_submissions/batch_submit_all.sh
+    sbatch batch_submissions/batch_submit_all_k{K_VALUE}.sh
     
     Examples:
-        python generate_batch_submissions.py          # Uses default k=5
-        python generate_batch_submissions.py --k 10   # Uses k=10
-        python generate_batch_submissions.py --k 20   # Uses k=20
+        python generate_batch_submissions.py          # Uses default k=5, creates batch_submit_all_k5.sh
+        python generate_batch_submissions.py --k 10   # Uses k=10, creates batch_submit_all_k10.sh
+        python generate_batch_submissions.py --k 20   # Uses k=20, creates batch_submit_all_k20.sh
 """
 
 import os
@@ -715,15 +715,15 @@ def main():
         "echo '========================================'",
     ])
     
-    # Write script
-    script_path = OUTPUT_DIR / "batch_submit_all.sh"
+    # Write script with k-specific filename
+    script_path = OUTPUT_DIR / f"batch_submit_all_k{args.k}.sh"
     with open(script_path, "w") as f:
         f.write("\n".join(script_lines))
     
     os.chmod(script_path, 0o755)
     
-    # Write job manifest
-    manifest_path = OUTPUT_DIR / "submission_manifest.json"
+    # Write job manifest with k-specific filename
+    manifest_path = OUTPUT_DIR / f"submission_manifest_k{args.k}.json"
     with open(manifest_path, "w") as f:
         json.dump(all_jobs, f, indent=2)
     
