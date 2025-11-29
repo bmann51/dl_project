@@ -9,21 +9,13 @@
 #SBATCH --output=logs/extract_acc_%j.out
 #SBATCH --error=logs/extract_acc_%j.err
 
-# Print info
-echo "========================================"
-echo "Extract Accuracies from Logs"
-echo "========================================"
-echo "Job started at: $(date)"
-echo "Running on node: $(hostname)"
-echo ""
+# Create logs directory
+mkdir -p logs
 
 # Base directory (parent of batch_submissions)
 SCRIPT_DIR=$(dirname $(realpath $0))
 BASE_DIR=$(dirname "$SCRIPT_DIR")
 cd "$BASE_DIR"
-
-# Create logs directory
-mkdir -p logs
 
 echo "Running extract_accuracies.py..."
 echo ""
@@ -32,16 +24,7 @@ echo ""
 python extract_accuracies.py --all
 
 echo ""
-echo "========================================"
 echo "Extraction Complete"
-echo "========================================"
-echo "Job finished at: $(date)"
-echo ""
 echo "Results saved to:"
 echo "  - batch_submissions/accuracy_summary.csv"
 echo "  - batch_submissions/accuracy_full_results.csv"
-echo ""
-echo "View results:"
-echo "  cat batch_submissions/accuracy_summary.csv"
-echo "========================================"
-

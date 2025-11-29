@@ -17,22 +17,14 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate dino_new
 
-# Print info
-echo "========================================"
-echo "Batch Evaluation Job Started"
-echo "========================================"
-echo "Job started at: $(date)"
-echo "Running on node: $(hostname)"
-echo "GPU info:"
-nvidia-smi
-echo ""
+# Create logs directory
+mkdir -p logs
 
 # Base directory
 BASE_DIR=$(dirname $(dirname $(realpath $0)))
 
 # Create output directories
 mkdir -p batch_submissions
-mkdir -p logs
 
 echo "Starting batch evaluation..."
 echo ""
@@ -42,10 +34,5 @@ cd "$BASE_DIR"
 python batch_evaluate_all.py
 
 echo ""
-echo "========================================"
-echo "Batch Evaluation Job Completed"
-echo "========================================"
-echo "Job finished at: $(date)"
+echo "Batch Evaluation Complete"
 echo "Check results in: batch_submissions/evaluation_results.csv"
-echo "========================================"
-

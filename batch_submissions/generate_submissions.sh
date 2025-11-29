@@ -16,13 +16,8 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate dino_new
 
-# Print info
-echo "========================================"
-echo "Generate Batch Submissions"
-echo "========================================"
-echo "Job started at: $(date)"
-echo "Running on node: $(hostname)"
-echo ""
+# Create logs directory
+mkdir -p logs
 
 # Base directory (parent of batch_submissions)
 SCRIPT_DIR=$(dirname $(realpath $0))
@@ -31,7 +26,6 @@ cd "$BASE_DIR"
 
 # Create output directories
 mkdir -p batch_submissions
-mkdir -p logs
 
 echo "Running generate_batch_submissions.py..."
 echo ""
@@ -40,13 +34,7 @@ echo ""
 python generate_batch_submissions.py
 
 echo ""
-echo "========================================"
 echo "Generation Complete"
-echo "========================================"
-echo "Job finished at: $(date)"
-echo ""
 echo "Next steps:"
 echo "  1. Review: batch_submissions/batch_submit_all.sh"
 echo "  2. Submit: sbatch batch_submissions/batch_submit_all.sh"
-echo "========================================"
-
