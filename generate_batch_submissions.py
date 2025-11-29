@@ -8,13 +8,19 @@ This script:
 3. Creates a job manifest for tracking
 
 Usage:
-    python generate_batch_submissions.py
+    python generate_batch_submissions.py [--k K_VALUE]
     sbatch batch_submissions/batch_submit_all.sh
+    
+    Examples:
+        python generate_batch_submissions.py          # Uses default k=5
+        python generate_batch_submissions.py --k 10   # Uses k=10
+        python generate_batch_submissions.py --k 20   # Uses k=20
 """
 
 import os
 import json
 import re
+import argparse
 from pathlib import Path
 from typing import List, Dict
 
@@ -138,27 +144,31 @@ def find_checkpoint_directories(pattern: str, base_path: Path = None) -> List[Pa
     return list(set([d for d in found_dirs if d.is_dir()]))
 
 
-def get_model_configs() -> Dict:
-    """Get all model configurations"""
+def get_model_configs(k: int = 5) -> Dict:
+    """Get all model configurations
+    
+    Args:
+        k: KNN parameter to use for all models (default: 5)
+    """
     return {
         # Acey DINO
         "acey-dino-tiny": {
             "folder": "acey-submission-folder",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_vit_tiny"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 8192, "bottleneck_dim": 256},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 8192, "bottleneck_dim": 256},
         },
         "acey-dino-small": {
             "folder": "acey-submission-folder",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_vit_small"],
-            "args": {"arch": "vit_small", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128},
+            "args": {"arch": "vit_small", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128},
         },
         "acey-dino-base": {
             "folder": "acey-submission-folder",
             "script": "generate_submission.py",
             "checkpoint_dirs": ["checkpoints_vit_base"],
-            "args": {"arch": "vit_base", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128},
+            "args": {"arch": "vit_base", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128},
         },
         
         # Acey iBOT v1
@@ -166,7 +176,7 @@ def get_model_configs() -> Dict:
             "folder": "acey-ibot-folder",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_vit_tiny_v1"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v2 (with variants: stable, balanced, peak_lr)
@@ -175,7 +185,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v2",  # Will discover variants like stable_2, balanced_2, peak_lr_2
             "use_variants": True,
-            "default_args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v3 (with variants: conservative, feedback, aggressive)
@@ -184,7 +194,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v3",  # Will discover variants
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v4
@@ -192,19 +202,19 @@ def get_model_configs() -> Dict:
             "folder": "acey-ibot-v4",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_vit_tiny_v4"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         "acey-ibot-v4-resnet": {
             "folder": "acey-ibot-v4",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_resnet_v4"],
-            "args": {"arch": "resnet50", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "resnet50", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         "acey-ibot-v4-convnext": {
             "folder": "acey-ibot-v4",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["checkpoints_ibot_convnext_v4"],
-            "args": {"arch": "convnext_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "args": {"arch": "convnext_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v5 (with variants)
@@ -213,7 +223,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v5",
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v7 (with variants)
@@ -222,7 +232,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v7",
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Acey iBOT v8 (with variants)
@@ -231,7 +241,7 @@ def get_model_configs() -> Dict:
             "script": "generate_submission_ibot.py",
             "checkpoint_pattern": "checkpoints_ibot_*_v8",
             "use_variants": True,
-            "default_args": {"resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "default_args": {"resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Brian DINO
@@ -239,21 +249,21 @@ def get_model_configs() -> Dict:
             "folder": "brian-folder",
             "script": "generate_submission2.py",
             "checkpoint_dirs": ["checkpoints_base"],
-            "args": {"arch": "vit_base", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128},
+            "args": {"arch": "vit_base", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128},
         },
         "brian-dino-small": {
             "folder": "brian-folder",
             "script": "generate_submission2.py",
             "checkpoint_dirs": ["checkpoints_small"],
-            "args": {"arch": "vit_small", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128},
+            "args": {"arch": "vit_small", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128},
         },
         
         # Macey iBOT v6
         "macey-ibot-v6": {
             "folder": "macey-ibot-v6",
             "script": "generate_submission.py",
-            "checkpoint_dirs": ["checkpoints_v6"],
-            "args": {"arch": "vit_tiny", "resolution": 96, "k": 5, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+            "checkpoint_dirs": ["checkpoints_v6", "dino/checkpoints_v6", "dino/macey-ibot-v6/checkpoints_v6", "dino/macey-ibot-v6"],
+            "args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
     }
 
@@ -398,12 +408,18 @@ def generate_submission_command(
 def main():
     """Main function to generate batch submission script"""
     
+    parser = argparse.ArgumentParser(description='Generate batch submission script for all model variations')
+    parser.add_argument('--k', type=int, default=5,
+                        help='KNN parameter k to use for all models (default: 5)')
+    args = parser.parse_args()
+    
     print("=" * 80)
     print("Batch Submission Generator")
     print("=" * 80)
+    print(f"Using k={args.k} for all models")
     print()
     
-    model_configs = get_model_configs()
+    model_configs = get_model_configs(k=args.k)
     all_jobs = []
     
     # Discover checkpoints and generate jobs
@@ -542,6 +558,32 @@ def main():
                             version_path = version_dir / checkpoint_dir
                             if version_path.exists():
                                 matching_dirs.append(version_path)
+                    
+                    # Also try in other subdirectories (e.g., dino/)
+                    for subdir in base_path.iterdir():
+                        if subdir.is_dir() and not subdir.name.startswith('v'):
+                            # Try subdir/checkpoint_dir (e.g., dino/checkpoints_v6)
+                            subdir_path = subdir / checkpoint_dir
+                            if subdir_path.exists():
+                                matching_dirs.append(subdir_path)
+                            # Try subdir/model_name/checkpoint_dir (e.g., dino/macey-ibot-v6/checkpoints_v6)
+                            # Try with dashes first (original model name)
+                            nested_path = subdir / model_name / checkpoint_dir
+                            if nested_path.exists():
+                                matching_dirs.append(nested_path)
+                            # Try with underscores
+                            nested_path_underscore = subdir / model_name.replace("-", "_") / checkpoint_dir
+                            if nested_path_underscore.exists():
+                                matching_dirs.append(nested_path_underscore)
+                            # Also check if subdir/model_name itself is the checkpoint dir (e.g., dino/macey-ibot-v6)
+                            # Try with dashes first
+                            model_dir = subdir / model_name
+                            if model_dir.exists() and ((model_dir / "final_checkpoint.pth").exists() or list(model_dir.glob("checkpoint_*.pth"))):
+                                matching_dirs.append(model_dir)
+                            # Try with underscores
+                            model_dir_underscore = subdir / model_name.replace("-", "_")
+                            if model_dir_underscore.exists() and ((model_dir_underscore / "final_checkpoint.pth").exists() or list(model_dir_underscore.glob("checkpoint_*.pth"))):
+                                matching_dirs.append(model_dir_underscore)
                 
                 for ckpt_dir in matching_dirs:
                     checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=1)  # Only final or highest checkpoint

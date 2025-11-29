@@ -46,20 +46,22 @@ class iBOTTokenizer(nn.Module):
 
 
 class iBOTHead(nn.Module):
-    """Projection head for iBOT - FIXED to match training architecture with BatchNorm"""
+    """Projection head for iBOT - matches training architecture (NO BatchNorm for v2)"""
     def __init__(self, in_dim, out_dim=65536, hidden_dim=2048, bottleneck_dim=256, 
-                 nlayers=3, norm_last_layer=True):
+                 nlayers=3, norm_last_layer=True, use_batchnorm=False):
         super().__init__()
         
-        # Build MLP with BatchNorm layers (this matches the checkpoint)
+        # Build MLP - v2 training uses NO BatchNorm, just Linear + GELU
         layers = []
         layers.append(nn.Linear(in_dim, hidden_dim))
-        layers.append(nn.BatchNorm1d(hidden_dim))
+        if use_batchnorm:
+            layers.append(nn.BatchNorm1d(hidden_dim))
         layers.append(nn.GELU())
         
         for _ in range(nlayers - 2):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
-            layers.append(nn.BatchNorm1d(hidden_dim))
+            if use_batchnorm:
+                layers.append(nn.BatchNorm1d(hidden_dim))
             layers.append(nn.GELU())
         
         layers.append(nn.Linear(hidden_dim, bottleneck_dim))
@@ -258,15 +260,15 @@ def load_ibot_model(checkpoint_path, arch='vit_tiny', img_size=96,
         global_pool=''  # Returns [batch, num_patches+1, embed_dim] instead of [batch, embed_dim]
     )
     
-    # Create iBOT heads - FIXED: Now includes BatchNorm layers
+    # Create iBOT heads - v2 uses NO BatchNorm (matches training code)
     head = iBOTHead(in_dim=embed_dim, out_dim=out_dim, hidden_dim=2048, 
-                    bottleneck_dim=bottleneck_dim, nlayers=3)
+                    bottleneck_dim=bottleneck_dim, nlayers=3, use_batchnorm=False)
     
     tokenizer = iBOTTokenizer(embed_dim=embed_dim, num_tokens=num_tokens, hidden_dim=512)
     
     # Create local heads if using untied architecture
     local_head = iBOTHead(in_dim=embed_dim, out_dim=out_dim, hidden_dim=2048,
-                         bottleneck_dim=bottleneck_dim, nlayers=3)
+                         bottleneck_dim=bottleneck_dim, nlayers=3, use_batchnorm=False)
     local_tokenizer = iBOTTokenizer(embed_dim=embed_dim, num_tokens=num_tokens, hidden_dim=512)
     
     model = MultiCropiBOTWrapper(backbone, head, tokenizer, local_head, local_tokenizer)
