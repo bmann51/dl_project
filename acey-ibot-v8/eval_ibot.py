@@ -293,6 +293,22 @@ def main(args):
     
     print("Model loaded and frozen")
     
+    # Test model forward first
+    print("\nTesting model forward...")
+    try:
+        test_batch = next(iter(train_loader))
+        test_images, test_labels = test_batch
+        test_images = test_images.to(device)
+        print(f"  Test batch images shape: {test_images.shape}")
+        test_features = model(test_images)
+        print(f"  Test batch features shape: {test_features.shape}")
+        print("  ✓ Model forward works!")
+    except Exception as e:
+        print(f"  ✗ Model forward failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    
     # Extract features
     print("\nExtracting train features...")
     train_features, train_labels = extract_features(model, train_loader, device)
