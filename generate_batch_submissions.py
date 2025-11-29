@@ -277,9 +277,9 @@ def generate_submission_command(
     else:
         args = {}
     
-    # Use provided output_path or construct it
+    # Use provided output_path or construct it (must be absolute since we cd into folder)
     if output_path is None:
-        output_path = f"{OUTPUT_DIR}/{output_name}"
+        output_path = str((OUTPUT_DIR / output_name).resolve())
     
     cmd_parts = [
         f"cd {PROJECT_ROOT / folder}",
@@ -379,7 +379,7 @@ def main():
                             for testset in TESTSETS:
                                 ckpt_name = Path(ckpt).stem
                                 output_name = f"submission_{variant_model_name}_{testset}_{ckpt_name}.csv"
-                                output_path = f"{OUTPUT_DIR}/{output_name}"
+                                output_path = str((OUTPUT_DIR / output_name).resolve())
                                 
                                 # Create config with checkpoint-specific args
                                 variant_config = config.copy()
@@ -432,7 +432,7 @@ def main():
                             for testset in TESTSETS:
                                 ckpt_name = Path(ckpt).stem
                                 output_name = f"submission_{model_name}_{testset}_{ckpt_name}.csv"
-                                output_path = f"{OUTPUT_DIR}/{output_name}"
+                                output_path = str((OUTPUT_DIR / output_name).resolve())
                                 
                                 all_jobs.append({
                                     "model": model_name,
@@ -551,7 +551,7 @@ def main():
     print(f"\nTo check status:")
     print(f"  squeue -u bm3772")
     print(f"  tail -f {OUTPUT_DIR}/batch_submit_*.out")
-    print(f"\nOutput files will be in each model's folder")
+    print(f"\nOutput files will be saved to: {OUTPUT_DIR}/")
     print(f"{'='*80}")
 
 
