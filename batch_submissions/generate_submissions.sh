@@ -9,6 +9,27 @@
 #SBATCH --output=logs/gen_submissions_%j.out
 #SBATCH --error=logs/gen_submissions_%j.err
 
+# Parse command-line arguments
+K_VALUE=5  # Default k value
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --k)
+            K_VALUE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: sbatch generate_submissions.sh [--k K_VALUE]"
+            exit 1
+            ;;
+    esac
+done
+
+# Also check environment variable (for SLURM --export)
+if [ -n "$K" ]; then
+    K_VALUE="$K"
+fi
+
 # Load modules
 module load cuda/11.8
 
@@ -38,6 +59,7 @@ mkdir -p batch_submissions
 echo "Running generate_batch_submissions.py..."
 echo "Base directory: $BASE_DIR"
 echo "Working directory: $(pwd)"
+echo "Using k=$K_VALUE for KNN"
 echo ""
 
 # Verify the script exists
@@ -48,7 +70,7 @@ if [ ! -f "$BASE_DIR/generate_batch_submissions.py" ]; then
 fi
 
 # Run the generator
-python "$BASE_DIR/generate_batch_submissions.py"
+python "$BASE_DIR/generate_batch_submissions.py" --k "$K_VALUE"
 
 echo ""
 echo "Generation Complete"
