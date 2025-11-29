@@ -107,7 +107,7 @@ python eval_knn.py \
 - `train_ibot_v10.py`: Main training script
 - `eval_knn.py`: k-NN evaluation script (reuses backbone from v9)
 - `check_parameters.py`: Script to verify backbone parameter count (< 100M)
-- `train_ibot_v10.sh`: SLURM training script
+- `train_ibot_v10_multicrop.sh`: SLURM training script
 - `eval_knn.sh`: SLURM evaluation script
 - `requirements.txt`: Python dependencies
 - `README.md`: This file

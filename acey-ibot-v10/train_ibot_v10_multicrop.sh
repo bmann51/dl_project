@@ -55,4 +55,3 @@ python train_ibot_v10.py \
     --num_local_crops 4 \
     --device cuda
     # --resume /gpfs/scratch/bm3772/checkpoints/v10/v10_ibot_multicrop/ibot_v10_epochXXX.pt
-
