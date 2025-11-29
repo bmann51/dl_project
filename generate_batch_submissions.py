@@ -360,7 +360,7 @@ def main():
                         parts = dir_name.replace("checkpoints_ibot_", "").split("_")
                         variant_name = parts[0] if parts else "unknown"
                     
-                    checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=3)
+                    checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=1)  # Only final or highest checkpoint
                     if checkpoints:
                         found_any = True
                         print(f"  {dir_name}: Found {len(checkpoints)} checkpoints")
@@ -420,7 +420,7 @@ def main():
                         matching_dirs.append(parent_path)
                 
                 for ckpt_dir in matching_dirs:
-                    checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=3)
+                    checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=1)  # Only final or highest checkpoint
                     
                     if checkpoints:
                         found_any = True
