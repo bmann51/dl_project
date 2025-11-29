@@ -406,6 +406,17 @@ def main():
                             # Create variant-specific model name
                             variant_model_name = f"{model_name}-{variant_name}"
                             
+                            # Set variant-specific default args based on training scripts
+                            variant_default_args = config["default_args"].copy()
+                            if variant_name == "aggressive":
+                                # Aggressive variants use: bottleneck_dim=256, out_dim=8192
+                                variant_default_args["bottleneck_dim"] = 256
+                                variant_default_args["out_dim"] = 8192
+                            else:
+                                # Conservative/Feedback variants use: bottleneck_dim=128, out_dim=4096
+                                variant_default_args["bottleneck_dim"] = 128
+                                variant_default_args["out_dim"] = 4096
+                            
                             # Generate jobs for each testset
                             for testset in TESTSETS:
                                 ckpt_name = Path(ckpt).stem
@@ -414,7 +425,7 @@ def main():
                                 
                                 # Create config with checkpoint-specific args
                                 variant_config = config.copy()
-                                variant_config["args"] = get_args_from_checkpoint(ckpt, config["default_args"])
+                                variant_config["args"] = get_args_from_checkpoint(ckpt, variant_default_args)
                                 
                                 all_jobs.append({
                                     "model": variant_model_name,
