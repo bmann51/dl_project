@@ -147,16 +147,31 @@ def extract_features(model, data_loader, device):
     features_list = []
     labels_list = []
     
-    for images, labels in tqdm(data_loader, desc="Extracting features"):
-        images = images.to(device)
-        
-        # Extract features (backbone only, no masking for evaluation)
-        # Model returns normalized CLS token for single images
-        features = model(images)
-        
-        # Features are already normalized in the forward pass
-        features_list.append(features.cpu())
-        labels_list.append(labels)
+    for i, (images, labels) in enumerate(tqdm(data_loader, desc="Extracting features")):
+        try:
+            images = images.to(device)
+            
+            # Extract features (backbone only, no masking for evaluation)
+            # Model returns normalized CLS token for single images
+            features = model(images)
+            
+            # Debug first batch
+            if i == 0:
+                print(f"\n  First batch - images shape: {images.shape}")
+                print(f"  First batch - features shape: {features.shape}")
+                print(f"  First batch - features type: {type(features)}")
+            
+            # Features are already normalized in the forward pass
+            features_list.append(features.cpu())
+            labels_list.append(labels)
+        except Exception as e:
+            print(f"\nERROR in extract_features at batch {i}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+    
+    if len(features_list) == 0:
+        raise ValueError("No features extracted! Check if dataloader is empty or model forward is failing.")
     
     features = torch.cat(features_list, dim=0).numpy()
     labels = torch.cat(labels_list, dim=0).numpy()
@@ -247,48 +262,36 @@ def main(args):
     # Create model wrapper
     model = MultiCropiBOTWrapper(backbone, global_head, global_tokenizer)
     
-    # Load weights
-    if 'teacher' in checkpoint:
-        state_dict = checkpoint['teacher']
-        print("  Found 'teacher' key in checkpoint")
-    elif 'student' in checkpoint:
+    # Load weights - use same approach as generate_submission_ibot.py
+    if 'student' in checkpoint:
         state_dict = checkpoint['student']
         print("  Found 'student' key in checkpoint")
+    elif 'model' in checkpoint:
+        state_dict = checkpoint['model']
+        print("  Found 'model' key in checkpoint")
     else:
         state_dict = checkpoint
         print("  Loading checkpoint directly")
     
-    # Extract backbone weights
-    backbone_state_dict = {}
-    for k, v in state_dict.items():
-        if 'backbone' in k:
-            new_key = k.replace('backbone.', '')
-            backbone_state_dict[new_key] = v
-        elif 'head' not in k and 'tokenizer' not in k and 'last_layer' not in k:
-            backbone_state_dict[k] = v
+    # Load state dict - same as submission script
+    missing, unexpected = model.load_state_dict(state_dict, strict=False)
+    if missing:
+        print(f"  Missing keys: {len(missing)}")
+        if len(missing) > 0:
+            print(f"  First few missing: {missing[:5]}")
+    if unexpected:
+        print(f"  Unexpected keys: {len(unexpected)}")
+        if len(unexpected) > 0:
+            print(f"  First few unexpected: {unexpected[:5]}")
     
-    missing_keys, unexpected_keys = backbone.load_state_dict(backbone_state_dict, strict=False)
-    if missing_keys:
-        print(f"WARNING: Missing keys: {missing_keys[:5]}...")
-    if unexpected_keys:
-        print(f"WARNING: Unexpected keys: {unexpected_keys[:5]}...")
-    
-    backbone = backbone.to(device)
-    backbone.eval()
-    
-    # Freeze backbone
-    for param in backbone.parameters():
-        param.requires_grad = False
-    
-    print("Backbone loaded and frozen")
-    
-    # Replace backbone in model with loaded backbone
-    model.backbone = backbone
     model.eval()
+    model.to(device)
+    
+    # Freeze model
     for param in model.parameters():
         param.requires_grad = False
     
-    model = model.to(device)
+    print("Model loaded and frozen")
     
     # Extract features
     print("\nExtracting train features...")
