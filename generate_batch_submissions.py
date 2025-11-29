@@ -262,7 +262,7 @@ def get_model_configs(k: int = 5) -> Dict:
         "macey-ibot-v6": {
             "folder": "macey-ibot-v6",
             "script": "generate_submission.py",
-            "checkpoint_dirs": ["checkpoints_v6", "dino/checkpoints_v6", "dino/macey-ibot-v6/checkpoints_v6", "dino/macey-ibot-v6"],
+            "checkpoint_dirs": ["checkpoints_v6", "checkpoints_ibot_v6_*", "checkpoints_ibot_*_v6", "dino/checkpoints_v6", "dino/macey-ibot-v6/checkpoints_v6", "dino/macey-ibot-v6"],
             "args": {"arch": "vit_tiny", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
     }
@@ -555,9 +555,16 @@ def main():
                     base_path = Path(BASE_CHECKPOINT_PATH)
                     for version_dir in base_path.glob("v*"):
                         if version_dir.is_dir():
+                            # Try exact match
                             version_path = version_dir / checkpoint_dir
                             if version_path.exists():
                                 matching_dirs.append(version_path)
+                            
+                            # Try glob pattern if checkpoint_dir contains *
+                            if "*" in checkpoint_dir:
+                                for matched_dir in version_dir.glob(checkpoint_dir):
+                                    if matched_dir.is_dir():
+                                        matching_dirs.append(matched_dir)
                     
                     # Also try in other subdirectories (e.g., dino/)
                     for subdir in base_path.iterdir():
