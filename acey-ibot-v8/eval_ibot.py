@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
@@ -9,7 +10,40 @@ from tqdm import tqdm
 import argparse
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
-from ibot_ssl import get_backbone, MultiCropiBOTWrapper, iBOTHead, iBOTTokenizer
+from ibot_ssl import get_backbone, MultiCropiBOTWrapper, iBOTTokenizer
+
+
+# Define BatchNorm version of iBOTHead to match training checkpoints
+class iBOTHead(nn.Module):
+    """Projection head for iBOT - FIXED to match training architecture with BatchNorm"""
+    def __init__(self, in_dim, out_dim=65536, hidden_dim=2048, bottleneck_dim=256, 
+                 nlayers=3, norm_last_layer=True):
+        super().__init__()
+        
+        # Build MLP with BatchNorm layers (this matches the checkpoint)
+        layers = []
+        layers.append(nn.Linear(in_dim, hidden_dim))
+        layers.append(nn.BatchNorm1d(hidden_dim))
+        layers.append(nn.GELU())
+        
+        for _ in range(nlayers - 2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.BatchNorm1d(hidden_dim))
+            layers.append(nn.GELU())
+        
+        layers.append(nn.Linear(hidden_dim, bottleneck_dim))
+        self.mlp = nn.Sequential(*layers)
+        
+        self.last_layer = nn.Linear(bottleneck_dim, out_dim, bias=False)
+        if norm_last_layer:
+            self.last_layer.weight.data = F.normalize(self.last_layer.weight.data, dim=1)
+            self.last_layer.weight.requires_grad = False
+    
+    def forward(self, x):
+        x = self.mlp(x)
+        x = F.normalize(x, dim=-1, p=2)
+        x = self.last_layer(x)
+        return x
 
 
 class LabeledImageDataset(Dataset):
