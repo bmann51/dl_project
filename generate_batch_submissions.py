@@ -592,7 +592,15 @@ def main():
                             if model_dir_underscore.exists() and ((model_dir_underscore / "final_checkpoint.pth").exists() or list(model_dir_underscore.glob("checkpoint_*.pth"))):
                                 matching_dirs.append(model_dir_underscore)
                 
+                # Deduplicate matching directories (same path might be found by multiple patterns)
+                unique_dirs = {}
                 for ckpt_dir in matching_dirs:
+                    # Use resolved absolute path as key to deduplicate
+                    resolved_path = str(ckpt_dir.resolve())
+                    if resolved_path not in unique_dirs:
+                        unique_dirs[resolved_path] = ckpt_dir
+                
+                for ckpt_dir in unique_dirs.values():
                     checkpoints = find_checkpoints(str(ckpt_dir), max_checkpoints=1)  # Only final or highest checkpoint
                     
                     if checkpoints:
