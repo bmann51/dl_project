@@ -248,6 +248,54 @@ def get_model_configs() -> Dict:
     }
 
 
+def infer_bottleneck_dim_from_checkpoint(checkpoint_path: str) -> int:
+    """Infer bottleneck_dim from checkpoint state_dict by finding the last Linear layer in head.mlp"""
+    try:
+        import torch
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
+        
+        # Get state dict
+        if 'student' in checkpoint:
+            state_dict = checkpoint['student']
+        elif 'model' in checkpoint:
+            state_dict = checkpoint['model']
+        else:
+            state_dict = checkpoint
+        
+        # Find the last Linear layer in head.mlp by checking all mlp.*.weight keys
+        # The last Linear layer should be: hidden_dim -> bottleneck_dim
+        # So its weight shape is [bottleneck_dim, hidden_dim]
+        mlp_linear_keys = []
+        for key in state_dict.keys():
+            if 'head.mlp.' in key and '.weight' in key and 'last_layer' not in key:
+                # Extract layer index
+                parts = key.split('.')
+                try:
+                    layer_idx = int(parts[2])  # head.mlp.{idx}.weight
+                    mlp_linear_keys.append((layer_idx, key))
+                except (ValueError, IndexError):
+                    continue
+        
+        if mlp_linear_keys:
+            # Sort by layer index and get the last one (highest index)
+            mlp_linear_keys.sort(key=lambda x: x[0])
+            last_layer_idx, last_key = mlp_linear_keys[-1]
+            weight_shape = state_dict[last_key].shape
+            
+            # weight_shape is [out_features, in_features] = [bottleneck_dim, hidden_dim]
+            if len(weight_shape) == 2:
+                bottleneck_dim = weight_shape[0]  # out_features dimension
+                hidden_dim = weight_shape[1]  # in_features dimension
+                # Verify it's reasonable (hidden_dim should be 2048)
+                if hidden_dim == 2048:
+                    print(f"    Inferred bottleneck_dim={bottleneck_dim} from checkpoint (last MLP layer: {last_key}, shape: {weight_shape})")
+                    return bottleneck_dim
+    except Exception as e:
+        print(f"    Could not infer bottleneck_dim from checkpoint: {e}")
+    
+    return None
+
+
 def get_args_from_checkpoint(checkpoint_path: str, default_args: Dict) -> Dict:
     """Extract args from checkpoint directory's args.json, merge with defaults"""
     checkpoint_dir = Path(checkpoint_path).parent
@@ -279,6 +327,15 @@ def get_args_from_checkpoint(checkpoint_path: str, default_args: Dict) -> Dict:
             print(f"    Warning: Could not read args.json from {checkpoint_dir}: {e}")
     else:
         print(f"    Warning: args.json not found in {checkpoint_dir}, using default args (bottleneck_dim={args['bottleneck_dim']})")
+    
+    # If we have a checkpoint path, try to infer bottleneck_dim from the checkpoint itself
+    # This helps when args.json has incorrect values
+    inferred_bottleneck = infer_bottleneck_dim_from_checkpoint(checkpoint_path)
+    if inferred_bottleneck is not None:
+        # Only override if the inferred value is different from what we have
+        if args.get("bottleneck_dim") != inferred_bottleneck:
+            print(f"    Overriding bottleneck_dim: {args.get('bottleneck_dim')} -> {inferred_bottleneck} (from checkpoint)")
+            args["bottleneck_dim"] = inferred_bottleneck
     
     return args
 
