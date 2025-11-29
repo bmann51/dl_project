@@ -17,21 +17,32 @@ module load cuda/11.8
 source ~/.bashrc
 conda activate dino_new
 
-# Create logs directory
+# Base directory - use SLURM_SUBMIT_DIR if available (where sbatch was run from)
+# Otherwise fall back to script location
+if [ -n "$SLURM_SUBMIT_DIR" ]; then
+    BASE_DIR="$SLURM_SUBMIT_DIR"
+else
+    # Get directory where this script is located, then go up one level
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BASE_DIR="$(dirname "$SCRIPT_DIR")"
+fi
+
+# Change to base directory first
+cd "$BASE_DIR" || exit 1
+
+# Create logs directory in base directory
 mkdir -p logs
 
-# Base directory
-BASE_DIR=$(dirname $(dirname $(realpath $0)))
-
-# Create output directories
+# Create output directories in base directory
 mkdir -p batch_submissions
 
 echo "Starting batch evaluation..."
+echo "Base directory: $BASE_DIR"
+echo "Working directory: $(pwd)"
 echo ""
 
 # Run batch evaluation script
-cd "$BASE_DIR"
-python batch_evaluate_all.py
+python "$BASE_DIR/batch_evaluate_all.py"
 
 echo ""
 echo "Batch Evaluation Complete"
