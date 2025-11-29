@@ -156,6 +156,12 @@ class ViTBackbone(nn.Module):
             num_classes=0,  # no classifier
             pretrained=False,
         )
+        # Disable strict img_size check inside timm's PatchEmbed so we can feed
+        # smaller local crops (e.g., 64×64) during multi-crop training.
+        # See timm/layers/patch_embed.py forward(): it asserts if H/W != img_size.
+        # Setting img_size to None bypasses that assert.
+        if hasattr(self.vit, "patch_embed") and hasattr(self.vit.patch_embed, "img_size"):
+            self.vit.patch_embed.img_size = None
         assert self.vit.embed_dim == embed_dim
 
     def forward(self, x):
