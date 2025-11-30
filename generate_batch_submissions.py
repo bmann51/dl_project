@@ -109,8 +109,8 @@ def find_checkpoint_directories(pattern: str, base_path: Path = None) -> List[Pa
             # Also try variant-specific patterns if pattern is generic
             if "*" in pattern:
                 # For patterns like "checkpoints_ibot_*_v8", try direct variant names
-                # v2 uses different variant names: stable, balanced, peak_lr
-                if version_num == "2":
+                # v2, v11, v12 use different variant names: stable, balanced, peak_lr
+                if version_num in ["2", "11", "12"]:
                     variant_patterns = [
                         f"checkpoints_ibot_stable_{version_num}",
                         f"checkpoints_ibot_balanced_{version_num}",
@@ -242,6 +242,40 @@ def get_model_configs(k: int = 5) -> Dict:
             "checkpoint_pattern": "checkpoints_ibot_*_v8",
             "use_variants": True,
             "default_args": {"resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+        },
+        
+        # Acey iBOT v9
+        "acey-ibot-v9": {
+            "folder": "acey-ibot-v9",
+            "script": "generate_submission_ibot.py",
+            "checkpoint_dirs": ["v9/v9a_ibot_checkpoint", "v9/v9_higher_mask_ibot_checkpoint"],
+            "args": {"arch": "vit_base", "resolution": 96, "k": k},
+        },
+        
+        # Acey iBOT v10
+        "acey-ibot-v10": {
+            "folder": "acey-ibot-v10",
+            "script": "generate_submission_ibot.py",
+            "checkpoint_dirs": ["v10/v10_ibot_multicrop", "v10/v10_ibot_highmask", "v10/v10_ibot_morelocals"],
+            "args": {"arch": "vit_base", "resolution": 96, "k": k},
+        },
+        
+        # Acey iBOT v11 (with variants: stable, balanced, peak_lr)
+        "acey-ibot-v11": {
+            "folder": "acey-ibot-v11",
+            "script": "generate_submission_ibot.py",
+            "checkpoint_pattern": "checkpoints_ibot_*_v11",
+            "use_variants": True,
+            "default_args": {"arch": "vit_small", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
+        },
+        
+        # Acey iBOT v12 (with variants: stable, balanced, peak_lr)
+        "acey-ibot-v12": {
+            "folder": "acey-ibot-v12",
+            "script": "generate_submission_ibot.py",
+            "checkpoint_pattern": "checkpoints_ibot_*_v12",
+            "use_variants": True,
+            "default_args": {"arch": "vit_base", "resolution": 96, "k": k, "out_dim": 4096, "bottleneck_dim": 128, "num_tokens": 8192},
         },
         
         # Brian DINO
@@ -437,35 +471,35 @@ def main():
                 
                 # Also try variant-specific patterns if main pattern doesn't match
                 if not matching_dirs:
-                    # Extract version from model name (e.g., "v8" from "acey-ibot-v8")
-                    version = model_name.split("-")[-1] if "-" in model_name else ""
-                    if version and version.startswith("v"):
-                        version_num = version[1:]  # "8" from "v8"
-                        # Try patterns like: checkpoints_ibot_conservative_8
-                        # v2 uses different variant names: stable, balanced, peak_lr
-                        if version_num == "2":
-                            variant_patterns = [
-                                f"checkpoints_ibot_stable_{version_num}",
-                                f"checkpoints_ibot_balanced_{version_num}",
-                                f"checkpoints_ibot_peak_lr_{version_num}",
-                            ]
-                            variant_patterns_v = [
-                                f"checkpoints_ibot_stable_v{version_num}",
-                                f"checkpoints_ibot_balanced_v{version_num}",
-                                f"checkpoints_ibot_peak_lr_v{version_num}",
-                            ]
-                        else:
-                            # v3, v5, v7, v8 use: conservative, feedback, aggressive
-                            variant_patterns = [
-                                f"checkpoints_ibot_conservative_{version_num}",
-                                f"checkpoints_ibot_feedback_{version_num}",
-                                f"checkpoints_ibot_aggressive_{version_num}",
-                            ]
-                            variant_patterns_v = [
-                                f"checkpoints_ibot_conservative_v{version_num}",
-                                f"checkpoints_ibot_feedback_v{version_num}",
-                                f"checkpoints_ibot_aggressive_v{version_num}",
-                            ]
+                        # Extract version from model name (e.g., "v8" from "acey-ibot-v8")
+                        version = model_name.split("-")[-1] if "-" in model_name else ""
+                        if version and version.startswith("v"):
+                            version_num = version[1:]  # "8" from "v8"
+                            # Try patterns like: checkpoints_ibot_conservative_8
+                            # v2, v11, v12 use different variant names: stable, balanced, peak_lr
+                            if version_num in ["2", "11", "12"]:
+                                variant_patterns = [
+                                    f"checkpoints_ibot_stable_{version_num}",
+                                    f"checkpoints_ibot_balanced_{version_num}",
+                                    f"checkpoints_ibot_peak_lr_{version_num}",
+                                ]
+                                variant_patterns_v = [
+                                    f"checkpoints_ibot_stable_v{version_num}",
+                                    f"checkpoints_ibot_balanced_v{version_num}",
+                                    f"checkpoints_ibot_peak_lr_v{version_num}",
+                                ]
+                            else:
+                                # v3, v5, v7, v8 use: conservative, feedback, aggressive
+                                variant_patterns = [
+                                    f"checkpoints_ibot_conservative_{version_num}",
+                                    f"checkpoints_ibot_feedback_{version_num}",
+                                    f"checkpoints_ibot_aggressive_{version_num}",
+                                ]
+                                variant_patterns_v = [
+                                    f"checkpoints_ibot_conservative_v{version_num}",
+                                    f"checkpoints_ibot_feedback_v{version_num}",
+                                    f"checkpoints_ibot_aggressive_v{version_num}",
+                                ]
                         for vp in variant_patterns:
                             matching_dirs.extend(find_checkpoint_directories(vp))
                         
