@@ -114,6 +114,7 @@ def generate_block_mask(batch_size, img_size=96, patch_size=16,
         mask[b, idx] = 1.0
     return mask  # [B, N]
 
+
 def apply_image_mask(x, mask, patch_size=16):
     """
     x: [B, 3, H, W]
@@ -134,7 +135,7 @@ def apply_image_mask(x, mask, patch_size=16):
                 if mask_flat[b, i, j] == 1:
                     h0 = i * patch_size
                     w0 = j * patch_size
-                    x[b, :, h0:h0+patch_size, w0:w0+patch_size] = 0.0
+                    x[b, :, h0:h0 + patch_size, w0:w0 + patch_size] = 0.0
     return x
 
 
@@ -145,23 +146,18 @@ def apply_image_mask(x, mask, patch_size=16):
 class ViTBackbone(nn.Module):
     """
     Wrap timm ViT-Base/16 to expose CLS and patch tokens.
+    Supports multi-crop via dynamic_img_size=True.
     """
     def __init__(self, img_size=96, patch_size=16, embed_dim=768):
         super().__init__()
-        # Standard timm name; we override img_size + num_classes.
         self.vit = timm.create_model(
             "vit_base_patch16_224",
             img_size=img_size,
             patch_size=patch_size,
-            num_classes=0,  # no classifier
+            num_classes=0,        # no classifier
             pretrained=False,
+            dynamic_img_size=True,  # allow 96x96 globals + 64x64 locals
         )
-        # Disable strict img_size check inside timm's PatchEmbed so we can feed
-        # smaller local crops (e.g., 64×64) during multi-crop training.
-        # See timm/layers/patch_embed.py forward(): it asserts if H/W != img_size.
-        # Setting img_size to None bypasses that assert.
-        if hasattr(self.vit, "patch_embed") and hasattr(self.vit.patch_embed, "img_size"):
-            self.vit.patch_embed.img_size = None
         assert self.vit.embed_dim == embed_dim
 
     def forward(self, x):
@@ -174,6 +170,7 @@ class ViTBackbone(nn.Module):
         cls = tokens[:, 0]
         patch = tokens[:, 1:]
         return cls, patch
+
 
 class ProjectionHead(nn.Module):
     """
@@ -194,6 +191,7 @@ class ProjectionHead(nn.Module):
         x = self.mlp(x)
         x = F.normalize(x, dim=-1)
         return x
+
 
 class StudentTeacherIBOT(nn.Module):
     """
@@ -396,4 +394,3 @@ class IBOTMultiCropLoss(nn.Module):
 
         loss = loss_cls + loss_mim
         return loss, {"loss_cls": float(loss_cls), "loss_mim": float(loss_mim)}
-
