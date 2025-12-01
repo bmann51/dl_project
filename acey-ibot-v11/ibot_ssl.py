@@ -308,11 +308,14 @@ class iBOTLoss(nn.Module):
         self.center_momentum = center_momentum
         self.register_buffer("center", torch.zeros(1, out_dim))
         
-        # Temperature schedule
-        self.teacher_temp_schedule = torch.cat((
-            torch.linspace(warmup_teacher_temp, teacher_temp, warmup_teacher_temp_epochs),
-            torch.ones(nepochs - warmup_teacher_temp_epochs) * teacher_temp
-        ))
+        # Temperature schedule (length = nepochs)
+        warmup_epochs = min(warmup_teacher_temp_epochs, nepochs)
+        warmup_sched = torch.linspace(warmup_teacher_temp, teacher_temp, warmup_epochs)
+        if nepochs > warmup_epochs:
+            rest = torch.ones(nepochs - warmup_epochs) * teacher_temp
+            self.teacher_temp_schedule = torch.cat((warmup_sched, rest))
+        else:
+            self.teacher_temp_schedule = warmup_sched
     
     def forward(self, student_output, teacher_output, 
                 student_token_logits, teacher_token_logits,
@@ -340,97 +343,92 @@ class iBOTLoss(nn.Module):
         if self.mim_loss_weight > 0:
             # student_token_logits: [batch * ncrops, num_patches+1, num_tokens]
             # teacher_token_logits: [batch * 2, num_patches+1, num_tokens]
-            # We only compute loss on patches (exclude CLS token at index 0)
-            
-            # Process each crop separately
             mim_losses = []
             total_masked_patches = 0
             for crop_idx in range(self.ncrops):
                 start_idx = crop_idx * batch_size
                 end_idx = (crop_idx + 1) * batch_size
                 
-                # Get student token predictions for this crop (patches only, exclude CLS)
-                student_tokens_crop = student_token_logits[start_idx:end_idx, 1:, :]  # [batch, num_patches, num_tokens]
+                # Student predictions for this crop (patches only)
+                student_tokens_crop = student_token_logits[start_idx:end_idx, 1:, :].float()
+                # Teacher predictions: use first global view, patches only
+                teacher_tokens_crop = teacher_token_logits[:batch_size, 1:, :].float()
                 
-                # Get teacher token predictions (use first global view)
-                teacher_tokens_crop = teacher_token_logits[:batch_size, 1:, :]  # [batch, num_patches, num_tokens]
-                
-                # Apply mask: only compute loss on masked patches
-                # student_mask: [batch, num_patches] where 0=masked, 1=visible
-                mask_expanded = student_mask.unsqueeze(-1)  # [batch, num_patches, 1]
+                # Mask: 0 = masked, 1 = visible
                 masked_patches = (student_mask == 0)  # [batch, num_patches]
                 num_masked = masked_patches.sum().item()
                 total_masked_patches += num_masked
                 
                 if num_masked > 0:
-                    # Get teacher soft targets for masked patches
                     teacher_tokens_masked = teacher_tokens_crop[masked_patches]  # [num_masked, num_tokens]
-                    # Use higher temperature to prevent collapse (0.15 instead of 0.07)
-                    teacher_tokens_masked = F.softmax(teacher_tokens_masked / self.mim_temp, dim=-1).detach()
+                    # Soft targets in float32 + clamp
+                    teacher_tokens_masked = F.softmax(teacher_tokens_masked / self.mim_temp, dim=-1)
+                    teacher_tokens_masked = torch.clamp(teacher_tokens_masked, 1e-6, 1.0 - 1e-6).detach()
                     
-                    # Get student predictions for masked patches
                     student_tokens_masked = student_tokens_crop[masked_patches]  # [num_masked, num_tokens]
-                    
-                    # Cross-entropy loss
+                    log_probs = F.log_softmax(student_tokens_masked, dim=-1)
                     mim_loss_crop = torch.sum(
-                        -teacher_tokens_masked * F.log_softmax(student_tokens_masked, dim=-1), dim=-1
+                        -teacher_tokens_masked * log_probs, dim=-1
                     ).mean()
                     
-                    mim_losses.append(mim_loss_crop)
+                    if not torch.isfinite(mim_loss_crop):
+                        print("WARNING: non-finite mim_loss_crop, skipping this crop")
+                    else:
+                        mim_losses.append(mim_loss_crop)
             
             if len(mim_losses) > 0:
                 mim_loss = sum(mim_losses) / len(mim_losses)
-                total_loss += self.mim_loss_weight * mim_loss
-                
-                # Store diagnostic info for potential debugging
-                # If mim_loss is 0, it could mean:
-                # 1. Model collapse (student = teacher exactly)
-                # 2. No masked patches (shouldn't happen with mask_ratio > 0)
-                # 3. Numerical precision (loss is tiny but not exactly 0)
-            else:
-                # No masked patches found - this shouldn't happen with proper mask_ratio
-                # But if it does, mim_loss stays at 0.0
-                # This could happen if mask_ratio is 0 or mask generation fails
-                pass
+                total_loss = total_loss + self.mim_loss_weight * mim_loss
         
         # 2. Self-distillation loss (DINO-style) on CLS tokens
         if self.cls_loss_weight > 0:
-            student_out = student_output / self.student_temp
+            # Student in float32
+            student_out = (student_output.float() / self.student_temp)
             student_out = student_out.chunk(self.ncrops)
             
-            # Teacher centering and sharpening
-            temp = self.teacher_temp_schedule[epoch] if epoch < len(self.teacher_temp_schedule) else self.teacher_temp_schedule[-1]
-            teacher_out = F.softmax((teacher_output - self.center) / temp, dim=-1)
+            # Teacher centering + sharpening in float32
+            temp_idx = min(epoch, len(self.teacher_temp_schedule) - 1)
+            temp = float(self.teacher_temp_schedule[temp_idx].item()) if isinstance(
+                self.teacher_temp_schedule[temp_idx], torch.Tensor
+            ) else float(self.teacher_temp_schedule[temp_idx])
+            
+            teacher_logits = (teacher_output.float() - self.center.float()) / temp
+            teacher_out = F.softmax(teacher_logits, dim=-1)
+            teacher_out = torch.clamp(teacher_out, 1e-6, 1.0 - 1e-6)
             teacher_out = teacher_out.detach().chunk(2)  # 2 global views for teacher
             
             cls_loss_terms = []
-            
             for iq, q in enumerate(teacher_out):
                 for v in range(len(student_out)):
                     if v == iq:
                         continue
-                    loss = torch.sum(-q * F.log_softmax(student_out[v], dim=-1), dim=-1)
-                    cls_loss_terms.append(loss.mean())
+                    loss_term = torch.sum(
+                        -q * F.log_softmax(student_out[v], dim=-1), dim=-1
+                    )
+                    if not torch.isfinite(loss_term).all():
+                        print("WARNING: non-finite cls loss term, skipping this pair")
+                        continue
+                    cls_loss_terms.append(loss_term.mean())
             
             if len(cls_loss_terms) > 0:
                 cls_loss = torch.stack(cls_loss_terms).mean()
-                total_loss += self.cls_loss_weight * cls_loss
+                total_loss = total_loss + self.cls_loss_weight * cls_loss
             
             # Update center
             self.update_center(teacher_output)
         
         # 3. KoLeo Regularization: Feature diversity (from DINOv2)
         if self.koleo_weight > 0:
-            # Compute KoLeo loss on teacher output to encourage feature diversity
-            # KoLeo: -log(det(pairwise_distances)) encourages features to be spread out
             koleo_loss = self.compute_koleo_loss(teacher_output)
-            total_loss += self.koleo_weight * koleo_loss
+            if torch.isfinite(koleo_loss):
+                total_loss = total_loss + self.koleo_weight * koleo_loss
+            else:
+                print("WARNING: non-finite KoLeo loss, skipping its contribution")
         
-        # Return total loss and component losses for monitoring
         return total_loss, {
-            'mim_loss': mim_loss.item() if isinstance(mim_loss, torch.Tensor) else mim_loss,
-            'cls_loss': cls_loss.item() if isinstance(cls_loss, torch.Tensor) else cls_loss,
-            'koleo_loss': koleo_loss.item() if isinstance(koleo_loss, torch.Tensor) else koleo_loss
+            'mim_loss': float(mim_loss.item()) if isinstance(mim_loss, torch.Tensor) else mim_loss,
+            'cls_loss': float(cls_loss.item()) if isinstance(cls_loss, torch.Tensor) else cls_loss,
+            'koleo_loss': float(koleo_loss.item()) if isinstance(koleo_loss, torch.Tensor) else koleo_loss
         }
     
     def compute_koleo_loss(self, features):
@@ -446,39 +444,29 @@ class iBOTLoss(nn.Module):
         Returns:
             koleo_loss: Scalar loss value
         """
-        # Normalize features
-        features = F.normalize(features, dim=-1, p=2)
+        # Normalize features in float32
+        features = F.normalize(features.float(), dim=-1, p=2)
         
-        # Compute pairwise distances
-        # features: [batch, dim]
-        # pairwise_dist: [batch, batch] where dist[i,j] = ||features[i] - features[j]||^2
+        # Pairwise distances
         pairwise_dist = torch.cdist(features, features, p=2) ** 2  # [batch, batch]
         
         # Add small epsilon to avoid log(0)
         pairwise_dist = pairwise_dist + self.koleo_eps
         
-        # Mask out diagonal (distance to self is 0, not useful)
         batch_size = features.shape[0]
         mask = ~torch.eye(batch_size, dtype=torch.bool, device=features.device)
         
-        # Compute negative log of distances (encourages larger distances)
-        # Only consider off-diagonal elements
         valid_distances = pairwise_dist[mask]
         
-        # KoLeo loss: negative sum of log distances
-        # This encourages features to be far apart
-        # Clip distances to prevent explosion when features collapse
-        # Use a minimum distance threshold to prevent log(very_small_value)
         min_dist = 1e-4  # Minimum distance threshold
         clipped_distances = torch.clamp(valid_distances, min=min_dist)
         koleo_loss = -torch.sum(torch.log(clipped_distances))
         
-        # Normalize by number of pairs
         num_pairs = mask.sum().float()
         if num_pairs > 0:
             koleo_loss = koleo_loss / num_pairs
         
-        # Additional clipping to prevent extreme values
+        # Extra clipping to prevent extreme values
         koleo_loss = torch.clamp(koleo_loss, max=10.0)
         
         return koleo_loss
@@ -486,7 +474,7 @@ class iBOTLoss(nn.Module):
     @torch.no_grad()
     def update_center(self, teacher_output):
         """Update center for teacher output"""
-        batch_center = torch.sum(teacher_output, dim=0, keepdim=True)
+        batch_center = torch.sum(teacher_output.float(), dim=0, keepdim=True)
         batch_center = batch_center / len(teacher_output)
         self.center = self.center * self.center_momentum + batch_center * (1 - self.center_momentum)
 
@@ -582,12 +570,18 @@ def get_backbone(arch='vit_small', patch_size=16, img_size=96, drop_path_rate=0.
 def cosine_scheduler(base_value, final_value, epochs, niter_per_ep, warmup_epochs=10,
                     start_warmup_value=0):
     """Cosine learning rate schedule with warmup"""
+    warmup_epochs = min(warmup_epochs, epochs)
     warmup_schedule = torch.linspace(start_warmup_value, base_value, warmup_epochs * niter_per_ep)
     
-    iters = torch.arange(epochs * niter_per_ep - warmup_epochs * niter_per_ep)
-    schedule = final_value + 0.5 * (base_value - final_value) * (1 + torch.cos(math.pi * iters / len(iters)))
-    
-    schedule = torch.cat((warmup_schedule, schedule))
+    remaining_iters = epochs * niter_per_ep - warmup_epochs * niter_per_ep
+    if remaining_iters > 0:
+        iters = torch.arange(remaining_iters)
+        schedule = final_value + 0.5 * (base_value - final_value) * (
+            1 + torch.cos(math.pi * iters / len(iters))
+        )
+        schedule = torch.cat((warmup_schedule, schedule))
+    else:
+        schedule = warmup_schedule
     return schedule
 
 
@@ -595,26 +589,19 @@ def cosine_scheduler_with_peak(peak_value, final_value, epochs, niter_per_ep,
                                warmup_epochs=10, start_warmup_value=0):
     """
     Cosine learning rate schedule with warmup to a peak, then cosine decay.
-    
-    Args:
-        peak_value: Peak LR reached after warmup
-        final_value: Final LR (minimum)
-        epochs: Total number of epochs
-        niter_per_ep: Number of iterations per epoch
-        warmup_epochs: Number of warmup epochs
-        start_warmup_value: Starting value for warmup (usually 0)
-    
-    Returns:
-        schedule: LR schedule tensor
     """
-    # Warmup: start_warmup_value -> peak_value
+    warmup_epochs = min(warmup_epochs, epochs)
     warmup_schedule = torch.linspace(start_warmup_value, peak_value, warmup_epochs * niter_per_ep)
     
-    # Cosine decay: peak_value -> final_value
-    iters = torch.arange(epochs * niter_per_ep - warmup_epochs * niter_per_ep)
-    schedule = final_value + 0.5 * (peak_value - final_value) * (1 + torch.cos(math.pi * iters / len(iters)))
-    
-    schedule = torch.cat((warmup_schedule, schedule))
+    remaining_iters = epochs * niter_per_ep - warmup_epochs * niter_per_ep
+    if remaining_iters > 0:
+        iters = torch.arange(remaining_iters)
+        schedule = final_value + 0.5 * (peak_value - final_value) * (
+            1 + torch.cos(math.pi * iters / len(iters))
+        )
+        schedule = torch.cat((warmup_schedule, schedule))
+    else:
+        schedule = warmup_schedule
     return schedule
 
 
@@ -630,7 +617,7 @@ def cancel_gradients_last_layer(epoch, model, freeze_last_layer):
     if epoch >= freeze_last_layer:
         return
     for n, p in model.named_parameters():
-        if "last_layer" in n:
+        if "last_layer" in n and p.grad is not None:
             p.grad = None
 
 
@@ -678,13 +665,11 @@ class LARS(torch.optim.Optimizer):
                 grad_norm = torch.norm(grad)
                 
                 if param_norm != 0 and grad_norm != 0:
-                    # Trust coefficient * param_norm / (grad_norm + weight_decay * param_norm)
                     local_lr = trust_coefficient * param_norm / (grad_norm + weight_decay * param_norm + eps)
                     local_lr = torch.clamp(local_lr, min=0.0, max=10.0)
                 else:
                     local_lr = 1.0
                 
-                # Scale learning rate
                 scaled_lr = lr * local_lr
                 
                 # Add weight decay to gradient
@@ -726,4 +711,3 @@ if __name__ == "__main__":
     print(f"Mask shape: {mask.shape}, masked patches: {(mask == 0).sum()}")
     
     print("\nAll tests passed!")
-

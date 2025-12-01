@@ -55,6 +55,5 @@ python train_ibot.py \
     --mim_temp 0.15 \
     --num_workers 8 \
     --save_freq 10 \
-    --use_fp16
     # --resume /gpfs/scratch/bm3772/checkpoints_ibot_peak_lr/checkpoint_XXXX.pth
 
