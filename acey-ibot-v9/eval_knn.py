@@ -46,7 +46,7 @@ def main():
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     # Load backbone (frozen encoder - no projection head for evaluation)
-    backbone = ViTBackbone(img_size=96, patch_size=16, embed_dim=768)
+    backbone = ViTBackbone(img_size=96, patch_size=16, embed_dim=384)
     ckpt = torch.load(args.checkpoint, map_location="cpu")
     backbone.load_state_dict(ckpt["student_backbone"])
     backbone.to(device)

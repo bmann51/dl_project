@@ -1,6 +1,7 @@
 import os
 import math
 import argparse
+import json
 import torch
 from torch.utils.data import DataLoader
 
@@ -34,6 +35,68 @@ def parse_args():
 def main():
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
+    
+    # Create comprehensive args dict with all configuration values
+    # (including hardcoded values from the training script)
+    args_dict = {
+        # Command-line arguments
+        "data_root": args.data_root,
+        "output_dir": args.output_dir,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "lr": args.lr,
+        "weight_decay": args.weight_decay,
+        "mask_ratio": args.mask_ratio,
+        "device": args.device,
+        
+        # Hardcoded model configuration
+        "arch": "vit_small",
+        "image_size": 96,
+        "patch_size": 16,
+        "embed_dim": 384,
+        "out_dim": 8192,
+        "hidden_dim": 2048,  # Projection head hidden dimension
+        
+        # Hardcoded training configuration
+        "optimizer": "adamw",
+        "betas": [0.9, 0.95],
+        "num_workers": 8,
+        "pin_memory": True,
+        "drop_last": True,
+        
+        # Hardcoded loss configuration
+        "student_temp_cls": 0.1,
+        "student_temp_patch": 0.1,
+        "teacher_temp_cls_start": 0.04,
+        "teacher_temp_cls_end": 0.07,
+        "teacher_temp_patch_start": 0.04,
+        "teacher_temp_patch_end": 0.07,
+        "warmup_teacher_temp_epochs": 30,
+        "center_momentum_cls": 0.9,
+        "center_momentum_patch": 0.9,
+        
+        # Hardcoded EMA configuration
+        "momentum_teacher_start": 0.996,
+        "momentum_teacher_end": 0.999,
+        
+        # Hardcoded augmentation (from SSLImageDataset)
+        "num_global_crops": 2,
+        "num_local_crops": 0,
+        "mask_type": "random",
+        
+        # LR schedule (cosine decay, no warmup)
+        "lr_schedule": "cosine",
+        "warmup_epochs": 0,
+        "min_lr": 0.0,
+        
+        # Save configuration
+        "save_freq": 50,
+    }
+    
+    # Save args.json
+    with open(os.path.join(args.output_dir, 'args.json'), 'w') as f:
+        json.dump(args_dict, f, indent=4)
+    
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
 
     dataset = SSLImageDataset(args.data_root)
@@ -46,7 +109,8 @@ def main():
         drop_last=True,
     )
 
-    model = StudentTeacherIBOT(img_size=96, patch_size=16, embed_dim=768, out_dim=8192).to(device)
+    model = StudentTeacherIBOT(img_size=96, patch_size=16, embed_dim=384, out_dim=8192)
+    model.to(device)
 
     # Optimizer (student backbone + head)
     optim = torch.optim.AdamW(

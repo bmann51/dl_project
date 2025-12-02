@@ -101,12 +101,13 @@ def apply_image_mask(x, mask, patch_size=16):
 
 class ViTBackbone(nn.Module):
     """
-    Wrap timm ViT-Base/16 to expose CLS and patch tokens.
+    Wrap timm ViT-Small/16 to expose CLS and patch tokens.
     """
-    def __init__(self, img_size=96, patch_size=16, embed_dim=768):
+    def __init__(self, img_size=96, patch_size=16, embed_dim=384):
         super().__init__()
+        # vit_small_patch16_224 is standard; we override img_size & num_classes
         self.vit = timm.create_model(
-            "vit_base_patch16_224",
+            "vit_small_patch16_224",
             img_size=img_size,
             patch_size=patch_size,
             num_classes=0,  # no classifier
@@ -153,7 +154,7 @@ class StudentTeacherIBOT(nn.Module):
       - Both share same backbone architecture and projection head architecture.
       - Teacher parameters are EMA of student.
     """
-    def __init__(self, img_size=96, patch_size=16, embed_dim=768, out_dim=8192):
+    def __init__(self, img_size=96, patch_size=16, embed_dim=384, out_dim=8192):
         super().__init__()
         self.student_backbone = ViTBackbone(img_size, patch_size, embed_dim)
         self.teacher_backbone = ViTBackbone(img_size, patch_size, embed_dim)

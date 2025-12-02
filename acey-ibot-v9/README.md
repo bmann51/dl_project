@@ -4,7 +4,7 @@ This is a clean, self-contained iBOT-style self-supervised learning implementati
 
 ## Key Features
 
-- **ViT-S/16 backbone** (< 100M params, random init, 96×96 resolution)
+- **ViT-Small/16 backbone** (~22M params, random init, 96×96 resolution)
 - **Pure cross-entropy loss** (no entropy/focal terms - MIM loss never goes negative)
 - **Shared projection head** for CLS and patch tokens (as in iBOT paper)
 - **Teacher centering + temperature scheduling** for both CLS and patches
@@ -65,7 +65,7 @@ python eval_knn.py \
 
 ## Architecture
 
-- **Backbone**: ViT-Base/16 (768 dim, ~86M params)
+- **Backbone**: ViT-Small/16 (384 dim, ~22M params)
 - **Projection Head**: 3-layer MLP (384 → 2048 → 2048 → 8192) with L2 normalization
 - **Masking**: Random patch masking in image space (mask_ratio=0.3)
 - **Augmentation**: Strong SimCLR/DINO-style augmentations

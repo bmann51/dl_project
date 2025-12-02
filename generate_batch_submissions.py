@@ -249,7 +249,7 @@ def get_model_configs(k: int = 5) -> Dict:
             "folder": "acey-ibot-v9",
             "script": "generate_submission_ibot.py",
             "checkpoint_dirs": ["v9/v9a_ibot_checkpoint", "v9/v9_higher_mask_ibot_checkpoint"],
-            "args": {"arch": "vit_base", "resolution": 96, "k": k},
+            "args": {"arch": "vit_small", "resolution": 96, "k": k},
         },
         
         # Acey iBOT v10

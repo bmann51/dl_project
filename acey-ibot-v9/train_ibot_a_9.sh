@@ -26,7 +26,7 @@ mkdir -p logs
 # Philosophy: Clean, competition-ready implementation
 # 
 # Key characteristics:
-# - ViT-Base/16 backbone (~86M params, under 100M limit)
+# - ViT-Small/16 backbone (~22M params, under 100M limit)
 # - Pure cross-entropy loss (no entropy/focal terms)
 # - Shared projection head for CLS and patch tokens
 # - Two global crops only (no local crops)

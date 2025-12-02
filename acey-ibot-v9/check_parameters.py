@@ -13,13 +13,13 @@ def count_parameters(model):
 
 def check_backbone_params(img_size=96):
     """Check parameter count for ViT-Base backbone."""
-    backbone = ViTBackbone(img_size=img_size, patch_size=16, embed_dim=768)
+    backbone = ViTBackbone(img_size=img_size, patch_size=16, embed_dim=384)
     param_count = count_parameters(backbone)
     
     print(f"\n{'='*60}")
     print(f"Architecture: ViT-Base/16")
     print(f"Image size: {img_size}x{img_size}")
-    print(f"Embedding dimension: 768")
+    print(f"Embedding dimension: 384")
     print(f"Backbone parameters: {param_count:,}")
     print(f"Under 100M limit: {'✅ YES' if param_count < 100_000_000 else '❌ NO'}")
     print(f"{'='*60}")
