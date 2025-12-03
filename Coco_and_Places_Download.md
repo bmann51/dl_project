@@ -1,6 +1,6 @@
 ## For coco you need to
 ### Set a basepath
-mkdir -p ~/data/coco/images ~/data/coco96
+mkdir -p ~/data/coco/images ~/data/coco96 \
 cd ~/data/coco/images
 
 ### Download Coco Images
