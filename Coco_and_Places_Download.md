@@ -18,4 +18,4 @@ cd ~/data/places365/raw
 tar -xf places365standard_easyformat.tar -C ~/data/places365/raw \
 note: there are other download commands
 
-### Use the resize_places_to96.py file
+### Use the resize_places_to_96.py file
